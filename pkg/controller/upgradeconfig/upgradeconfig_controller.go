@@ -3,8 +3,10 @@ package upgradeconfig
 import (
 	"context"
 	"fmt"
+	"k8s.io/apimachinery/pkg/types"
 	"time"
 
+	configv1 "github.com/openshift/api/config/v1"
 	upgradev1alpha1 "github.com/openshift/managed-upgrade-operator/pkg/apis/upgrade/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -89,6 +91,25 @@ func (r *ReconcileUpgradeConfig) Reconcile(request reconcile.Request) (reconcile
 		return reconcile.Result{}, err
 	}
 
+	cv := &configv1.ClusterVersion{}
+	err = r.client.Get(context.TODO(), types.NamespacedName{Name: "version"}, cv)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+
+	for _, update := range cv.Status.AvailableUpdates {
+		if update.Force == false && update.Version == instance.Spec.Desired.Version {
+			cv.Spec.Overrides = nil
+			cv.Spec.Channel = instance.Spec.Desired.Channel
+			cv.Spec.DesiredUpdate = &configv1.Update{
+				Version: instance.Spec.Desired.Version,
+			}
+			err := r.client.Update(context.TODO(), cv)
+			if err != nil {
+				return reconcile.Result{}, err
+			}
+		}
+	}
 	return reconcile.Result{
 		RequeueAfter: time.Hour,
 	}, nil
