@@ -86,12 +86,12 @@ func (r *ReconcileUpgradeConfig) Reconcile(request reconcile.Request) (reconcile
 	}
 
 	// If cluster is already upgrading with different version, we should wait until it completed
-	upgrading, err := cluster_upgrader.IsClusterUpgrading(r.client, instance.Spec.Desired.Version)
+	upgrading, err := cluster_upgrader.IsClusterUpgrading(r.client)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
 	if upgrading {
-		reqLogger.Info("cluster is upgrading with different version, cannot upgrade now")
+		reqLogger.Info("Cluster is upgrading...")
 		return reconcile.Result{}, nil
 	}
 
@@ -103,61 +103,38 @@ func (r *ReconcileUpgradeConfig) Reconcile(request reconcile.Request) (reconcile
 			found = true
 		}
 	}
+
 	if !found {
-		history = upgradev1alpha1.UpgradeHistory{Version: instance.Spec.Desired.Version, Phase: upgradev1alpha1.UpgradePhaseNew}
+		history = upgradev1alpha1.UpgradeHistory{Version: instance.Spec.Desired.Version}
 		history.Conditions = upgradev1alpha1.NewConditions()
 		instance.Status.History = append([]upgradev1alpha1.UpgradeHistory{history}, instance.Status.History...)
-		err := r.client.Status().Update(context.TODO(), instance)
-		if err != nil {
+
+		reqLogger.Info("Checking whether it's time to do an upgrade")
+		ready := cluster_upgrader.IsTimeToUpgrade(instance)
+		if !ready {
+			history.Phase = upgradev1alpha1.UpgradePhasePending
+			err := r.client.Status().Update(context.TODO(), instance)
+			if err != nil {
+				reqLogger.Info("Failed to set pending status for upgrade!")
+				return reconcile.Result{}, err
+			}
 			return reconcile.Result{}, err
+		} else {
+			history.Phase = upgradev1alpha1.UpgradePhaseUpgrading
 		}
 	}
 
-	status := history.Phase
-	reqLogger.Info("current cluster status", "status", status)
+	reqLogger.Info("Current cluster status", "status", history.Phase)
+	upgrader, err := r.clusterUpgraderBuilder.NewClient(r.client)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
 
-	switch status {
-	case "", upgradev1alpha1.UpgradePhaseNew, upgradev1alpha1.UpgradePhasePending:
-		// TODO verify if it's time to do upgrade, if no, set to "pending", if it's yes, perform upgrade, and set status to "upgrading"
-		reqLogger.Info("checking whether it's ready to do upgrade")
-		ready := cluster_upgrader.IsReadyToUpgrade(instance)
-		if ready {
-			upgrader, err := r.clusterUpgraderBuilder.NewClient(r.client)
-			if err != nil {
-				return reconcile.Result{}, err
-			}
-			reqLogger.Info("it's ready to start upgrade now", "time", time.Now())
-			err = upgrader.UpgradeCluster(instance, reqLogger)
-			if err != nil {
-				reqLogger.Error(err, "Failed to upgrade cluster")
-			}
-
-		} else {
-			err := r.updateStatusPending(reqLogger, instance)
-			if err != nil {
-				// TODO updateStatusPending implements nothing so far so below logged message to be changed when implemented
-				reqLogger.Info("Failed to set pending status for upgrade!")
-			}
-			return reconcile.Result{}, nil
-		}
-	case upgradev1alpha1.UpgradePhaseUpgrading:
-		upgrader, err := r.clusterUpgraderBuilder.NewClient(r.client)
-		if err != nil {
-			return reconcile.Result{}, err
-		}
-		reqLogger.Info("it's upgrading now")
-		err = upgrader.UpgradeCluster(instance, reqLogger)
-		if err != nil {
-			reqLogger.Error(err, "Failed to upgrade cluster")
-		}
-	case upgradev1alpha1.UpgradePhaseUpgraded:
-		reqLogger.Info("cluster is already upgraded")
-		return reconcile.Result{}, nil
-	case upgradev1alpha1.UpgradePhaseFailed:
-		reqLogger.Info("the cluster failed the upgrade")
-		return reconcile.Result{}, nil
-	default:
-		reqLogger.Info("unknown status")
+	reqLogger.Info("Reconciling upgrade ", "time", time.Now())
+	err = upgrader.UpgradeCluster(instance, reqLogger)
+	if err != nil {
+		reqLogger.Error(err, "Failed to upgrade cluster")
+		return reconcile.Result{}, err
 	}
 
 	return reconcile.Result{}, nil

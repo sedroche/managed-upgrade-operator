@@ -22,6 +22,7 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	routev1 "github.com/openshift/api/route/v1"
 	"github.com/openshift/cluster-version-operator/pkg/cincinnati"
+	rm "github.com/openshift/cluster-version-operator/lib/resourcemerge"
 	machineapi "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
 	machineconfigapi "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 	upgradev1alpha1 "github.com/openshift/managed-upgrade-operator/pkg/apis/upgrade/v1alpha1"
@@ -816,18 +817,17 @@ func getCurrentVersion(clusterVersion *configv1.ClusterVersion) string {
 }
 
 // This return the current upgrade status
-func IsClusterUpgrading(c client.Client, version string) (bool, error) {
+func IsClusterUpgrading(c client.Client) (bool, error) {
 	clusterVersion := &configv1.ClusterVersion{}
 	err := c.Get(context.TODO(), types.NamespacedName{Name: "version"}, clusterVersion)
 	if err != nil {
 		return false, err
 	}
-	for _, c := range clusterVersion.Status.Conditions {
-		if c.Type == configv1.OperatorProgressing && c.Status == configv1.ConditionTrue && version != clusterVersion.Spec.DesiredUpdate.Version {
-			return true, nil
 
-		}
+	if rm.IsOperatorStatusConditionTrue(clusterVersion.Status.Conditions, configv1.OperatorProgressing) {
+		return true, nil
 	}
+
 	return false, nil
 }
 
@@ -841,6 +841,6 @@ func newUpgradeCondition(reason, msg string, conditionType upgradev1alpha1.Upgra
 }
 
 // TODO readyToUpgrade checks whether it's ready to upgrade based on the scheduling
-func IsReadyToUpgrade(upgradeConfig *upgradev1alpha1.UpgradeConfig) bool {
+func IsTimeToUpgrade(upgradeConfig *upgradev1alpha1.UpgradeConfig) bool {
 	return true
 }

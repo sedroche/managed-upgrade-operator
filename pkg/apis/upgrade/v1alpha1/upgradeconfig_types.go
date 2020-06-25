@@ -96,8 +96,6 @@ const (
 	UpgradePhasePending   UpgradePhase = "Pending"
 	UpgradePhaseUpgrading UpgradePhase = "Upgrading"
 	UpgradePhaseUpgraded  UpgradePhase = "Upgraded"
-	UpgradePhaseFailed    UpgradePhase = "Failed"
-	UpgradePhaseUnknown   UpgradePhase = "Unknown"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
