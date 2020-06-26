@@ -2,8 +2,6 @@ package upgradeconfig
 
 import (
 	"context"
-	"time"
-
 	upgradev1alpha1 "github.com/openshift/managed-upgrade-operator/pkg/apis/upgrade/v1alpha1"
 	"github.com/openshift/managed-upgrade-operator/pkg/cluster_upgrader"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -85,57 +83,71 @@ func (r *ReconcileUpgradeConfig) Reconcile(request reconcile.Request) (reconcile
 		return reconcile.Result{}, err
 	}
 
-	// If cluster is already upgrading with different version, we should wait until it completed
-	upgrading, err := cluster_upgrader.IsClusterUpgrading(r.client)
+	//Repeat based on whether we have a history for this version
+		// Is there a new upgrade version specified
+		// Is it valid
+		// Is it time to Upgrade
+
+	// Once we have a history, skip above. We are Upgrading now.
+	// Upgrade history
+	// Manage History status
+
+	cv, err := cluster_upgrader.GetClusterVersion(r.client);
 	if err != nil {
 		return reconcile.Result{}, err
 	}
-	if upgrading {
-		reqLogger.Info("Cluster is upgrading...")
+
+	desiredVersion := instance.Spec.Desired.Version
+	if cv.Spec.DesiredUpdate.Version != desiredVersion && (instance.Status.History == nil && !instance.Status.History.HasHistory(desiredVersion)) {
+		reqLogger.Info("No Upgrade required.")
 		return reconcile.Result{}, nil
 	}
 
-	var history upgradev1alpha1.UpgradeHistory
-	found := false
-	for _, h := range instance.Status.History {
-		if h.Version == instance.Spec.Desired.Version {
-			history = h
-			found = true
-		}
-	}
-
-	if !found {
-		history = upgradev1alpha1.UpgradeHistory{Version: instance.Spec.Desired.Version}
-		history.Conditions = upgradev1alpha1.NewConditions()
-		instance.Status.History = append([]upgradev1alpha1.UpgradeHistory{history}, instance.Status.History...)
-
-		reqLogger.Info("Checking whether it's time to do an upgrade")
-		ready := cluster_upgrader.IsTimeToUpgrade(instance)
-		if !ready {
-			history.Phase = upgradev1alpha1.UpgradePhasePending
-			err := r.client.Status().Update(context.TODO(), instance)
-			if err != nil {
-				reqLogger.Info("Failed to set pending status for upgrade!")
-				return reconcile.Result{}, err
-			}
-			return reconcile.Result{}, err
-		} else {
-			history.Phase = upgradev1alpha1.UpgradePhaseUpgrading
-		}
-	}
-
-	reqLogger.Info("Current cluster status", "status", history.Phase)
-	upgrader, err := r.clusterUpgraderBuilder.NewClient(r.client)
-	if err != nil {
-		return reconcile.Result{}, err
-	}
-
-	reqLogger.Info("Reconciling upgrade ", "time", time.Now())
-	err = upgrader.UpgradeCluster(instance, reqLogger)
-	if err != nil {
-		reqLogger.Error(err, "Failed to upgrade cluster")
-		return reconcile.Result{}, err
-	}
+	//var history upgradev1alpha1.UpgradeHistory
+	//found := false
+	//for _, h := range instance.Status.History {
+	//	if h.Version == instance.Spec.Desired.Version {
+	//		history = h
+	//		found = true
+	//	}
+	//}
+	//
+	//if !found {
+	//	history = upgradev1alpha1.UpgradeHistory{Version: instance.Spec.Desired.Version}
+	//	history.Conditions = upgradev1alpha1.NewConditions()
+	//	instance.Status.History = append([]upgradev1alpha1.UpgradeHistory{history}, instance.Status.History...)
+	//
+	//	reqLogger.Info("Checking whether it's time to do an upgrade")
+	//	ready := cluster_upgrader.IsTimeToUpgrade(instance)
+	//	if !ready {
+	//		history.Phase = upgradev1alpha1.UpgradePhasePending
+	//		err := r.client.Status().Update(context.TODO(), instance)
+	//		if err != nil {
+	//			reqLogger.Info("Failed to set pending status for upgrade!")
+	//			return reconcile.Result{}, err
+	//		}
+	//		return reconcile.Result{}, err
+	//	} else {
+	//		history.Phase = upgradev1alpha1.UpgradePhaseUpgrading
+	//	}
+	//}
+	//
+	//reqLogger.Info("Current cluster status", "status", history.Phase)
+	//upgrader, err := r.clusterUpgraderBuilder.NewClient(r.client)
+	//if err != nil {
+	//	return reconcile.Result{}, err
+	//}
+	//
+	//reqLogger.Info("Reconciling upgrade ", "time", time.Now())
+	//err = upgrader.UpgradeCluster(instance, reqLogger)
+	//if err != nil {
+	//	reqLogger.Error(err, "Failed to upgrade cluster")
+	//	return reconcile.Result{}, err
+	//}
 
 	return reconcile.Result{}, nil
+}
+
+func upgradeRequested() {
+
 }

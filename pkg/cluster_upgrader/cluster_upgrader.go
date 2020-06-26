@@ -518,6 +518,16 @@ func ControlPlaneUpgraded(c client.Client, m maintenance.Maintenance, upgradeCon
 // This trigger the upgrade process
 func (cu clusterUpgrader) UpgradeCluster(upgradeConfig *upgradev1alpha1.UpgradeConfig, logger logr.Logger) error {
 
+	// If cluster is already upgrading, we should wait until it is completed
+	upgrading, err := isClusterUpgrading(cu.client)
+	if err != nil {
+		return err
+	}
+	if upgrading {
+		logger.Info("Cluster is upgrading...")
+		return nil
+	}
+
 	logger.Info("upgrading cluster")
 	history := upgradeConfig.Status.History.GetHistory(upgradeConfig.Spec.Desired.Version)
 	conditions := history.Conditions
@@ -597,7 +607,7 @@ func (cu clusterUpgrader) UpgradeCluster(upgradeConfig *upgradev1alpha1.UpgradeC
 	history.Phase = upgradev1alpha1.UpgradePhaseUpgraded
 	history.CompleteTime = &metav1.Time{Time: time.Now()}
 	upgradeConfig.Status.History.SetHistory(*history)
-	err := cu.client.Status().Update(context.TODO(), upgradeConfig)
+	err = cu.client.Status().Update(context.TODO(), upgradeConfig)
 	if err != nil {
 		return err
 	}
@@ -817,7 +827,7 @@ func getCurrentVersion(clusterVersion *configv1.ClusterVersion) string {
 }
 
 // This return the current upgrade status
-func IsClusterUpgrading(c client.Client) (bool, error) {
+func isClusterUpgrading(c client.Client) (bool, error) {
 	clusterVersion := &configv1.ClusterVersion{}
 	err := c.Get(context.TODO(), types.NamespacedName{Name: "version"}, clusterVersion)
 	if err != nil {
