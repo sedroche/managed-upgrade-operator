@@ -271,6 +271,15 @@ func (conditions *Conditions) RemoveCondition(t UpgradeConditionType) bool {
 	return false
 }
 
+func (histories UpgradeHistories) HasHistory(version string) bool {
+	for _, h := range histories {
+		if h.Version == version {
+			return true
+		}
+	}
+
+	return false
+}
 func (histories UpgradeHistories) GetHistory(version string) *UpgradeHistory {
 	for _, history := range histories {
 		if history.Version == version {

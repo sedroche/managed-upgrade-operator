@@ -2,12 +2,14 @@ package upgradeconfig
 
 import (
 	"context"
-	"time"
-
+	configv1 "github.com/openshift/api/config/v1"
+	rm "github.com/openshift/cluster-version-operator/lib/resourcemerge"
 	upgradev1alpha1 "github.com/openshift/managed-upgrade-operator/pkg/apis/upgrade/v1alpha1"
 	"github.com/openshift/managed-upgrade-operator/pkg/cluster_upgrader"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -15,6 +17,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+	"time"
 )
 
 var log = logf.Log.WithName("controller_upgradeconfig")
@@ -47,6 +50,8 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	if err != nil {
 		return err
 	}
+
+	// TODO: Do I need to watch the ClusterVersion? To speed up status updates/is ready checks?
 	return nil
 }
 
@@ -85,80 +90,112 @@ func (r *ReconcileUpgradeConfig) Reconcile(request reconcile.Request) (reconcile
 		return reconcile.Result{}, err
 	}
 
-	// If cluster is already upgrading with different version, we should wait until it completed
-	upgrading, err := cluster_upgrader.IsClusterUpgrading(r.client, instance.Spec.Desired.Version)
+	//Repeat based on whether we have a history for this version
+	// Is there a new upgrade version specified
+	// Is it valid
+	// Is it time to Upgrade
+
+	// Once we have a history with not pending, skip above. We are Upgrading now.
+	// Upgrade history
+	// Manage History status
+
+	cv, err := getClusterVersion(r.client)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
-	if upgrading {
-		reqLogger.Info("cluster is upgrading with different version, cannot upgrade now")
+
+	// Advantages:
+	// Upgrade is handled by the reconcile controller not the clusterupgrade logic. clusterupgrade logic should be independent of our upgradeconfig logic of when and if valid
+	desiredVersion := instance.Spec.Desired.Version
+	if !isNewDesiredVersion(cv, desiredVersion) {
+		reqLogger.Info("No Upgrade required.")
 		return reconcile.Result{}, nil
 	}
 
-	var history upgradev1alpha1.UpgradeHistory
-	found := false
-	for _, h := range instance.Status.History {
-		if h.Version == instance.Spec.Desired.Version {
-			history = h
-			found = true
+	reqLogger.Info("Validating UpgradeConfig")
+	err = cluster_upgrader.IsValidUpgradeConfig(instance, cv)
+	if err != nil {
+		// TODO: We need to Alert here
+		_, ok := err.(*cluster_upgrader.ValidationError)
+		if ok {
+			// TODO: Is this double logging?
+			reqLogger.Info(err.Error())
 		}
+		return reconcile.Result{}, err
 	}
-	if !found {
-		history = upgradev1alpha1.UpgradeHistory{Version: instance.Spec.Desired.Version, Phase: upgradev1alpha1.UpgradePhaseNew}
+
+	var history upgradev1alpha1.UpgradeHistory
+	if instance.Status.History == nil {
+		history = upgradev1alpha1.UpgradeHistory{Version: instance.Spec.Desired.Version, Phase: upgradev1alpha1.UpgradePhasePending}
+	} else {
+		history = *instance.Status.History.GetHistory(desiredVersion)
+	}
+
+	if history.Phase != upgradev1alpha1.UpgradePhasePending {
+
+	}
+
+	isTime := cluster_upgrader.IsTimeToUpgrade(instance)
+	if history.StartTime == nil && !isTime {
 		history.Conditions = upgradev1alpha1.NewConditions()
 		instance.Status.History = append([]upgradev1alpha1.UpgradeHistory{history}, instance.Status.History...)
 		err := r.client.Status().Update(context.TODO(), instance)
 		if err != nil {
 			return reconcile.Result{}, err
 		}
+
+		return reconcile.Result{}, nil
 	}
 
-	status := history.Phase
-	reqLogger.Info("current cluster status", "status", status)
+	// We should now start upgrading. Set phase and record start time.
+	if history.StartTime == nil {
+		history.Phase = upgradev1alpha1.UpgradePhaseUpgrading
+		history.StartTime = &metav1.Time{Time: time.Now()}
 
-	switch status {
-	case "", upgradev1alpha1.UpgradePhaseNew, upgradev1alpha1.UpgradePhasePending:
-		// TODO verify if it's time to do upgrade, if no, set to "pending", if it's yes, perform upgrade, and set status to "upgrading"
-		reqLogger.Info("checking whether it's ready to do upgrade")
-		ready := cluster_upgrader.IsReadyToUpgrade(instance)
-		if ready {
-			upgrader, err := r.clusterUpgraderBuilder.NewClient(r.client)
-			if err != nil {
-				return reconcile.Result{}, err
-			}
-			reqLogger.Info("it's ready to start upgrade now", "time", time.Now())
-			err = upgrader.UpgradeCluster(instance, reqLogger)
-			if err != nil {
-				reqLogger.Error(err, "Failed to upgrade cluster")
-			}
-
-		} else {
-			err := r.updateStatusPending(reqLogger, instance)
-			if err != nil {
-				// TODO updateStatusPending implements nothing so far so below logged message to be changed when implemented
-				reqLogger.Info("Failed to set pending status for upgrade!")
-			}
-			return reconcile.Result{}, nil
-		}
-	case upgradev1alpha1.UpgradePhaseUpgrading:
-		upgrader, err := r.clusterUpgraderBuilder.NewClient(r.client)
+		instance.Status.History.SetHistory(history)
+		err = r.client.Status().Update(context.TODO(), instance)
 		if err != nil {
 			return reconcile.Result{}, err
 		}
-		reqLogger.Info("it's upgrading now")
-		err = upgrader.UpgradeCluster(instance, reqLogger)
-		if err != nil {
-			reqLogger.Error(err, "Failed to upgrade cluster")
-		}
-	case upgradev1alpha1.UpgradePhaseUpgraded:
-		reqLogger.Info("cluster is already upgraded")
+	}
+
+	status := history.Phase
+	reqLogger.Info("Current cluster status", "status", status)
+
+	upgrader, err := r.clusterUpgraderBuilder.NewClient(r.client)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+	reqLogger.Info("Reconciling UpgradeConfig")
+	upgradeconfig, err := upgrader.UpgradeCluster(instance, reqLogger)
+	if err != nil {
+		reqLogger.Error(err, "Failed to upgrade cluster")
+	}
+
+	h := upgradeconfig.Status.History.GetHistory(desiredVersion)
+	if  h.Phase == upgradev1alpha1.UpgradePhaseUpgraded {
+		history.CompleteTime = &metav1.Time{Time: time.Now()}
+	}
+
+	upgradeconfig.Status.History.SetHistory(*h)
+	err = r.client.Status().Update(context.TODO(), upgradeconfig)
+	if err != nil {
 		return reconcile.Result{}, nil
-	case upgradev1alpha1.UpgradePhaseFailed:
-		reqLogger.Info("the cluster failed the upgrade")
-		return reconcile.Result{}, nil
-	default:
-		reqLogger.Info("unknown status")
 	}
 
 	return reconcile.Result{}, nil
+}
+
+func getClusterVersion(c client.Client) (*configv1.ClusterVersion, error) {
+	cv := &configv1.ClusterVersion{}
+	err := c.Get(context.TODO(), types.NamespacedName{Name: "version"}, cv)
+	if err != nil {
+		return nil, err
+	}
+
+	return cv, nil
+}
+
+func isNewDesiredVersion(cv *configv1.ClusterVersion, desiredVersion string) bool {
+	return cv.Spec.DesiredUpdate.Version != desiredVersion && !rm.IsOperatorStatusConditionTrue(cv.Status.Conditions, configv1.OperatorProgressing)
 }

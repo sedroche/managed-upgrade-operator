@@ -65,7 +65,7 @@ const (
 // Interface describing the functions of a cluster upgrader.
 //go:generate mockgen -destination=mocks/cluster_upgrader.go -package=mocks github.com/openshift/managed-upgrade-operator/pkg/cluster_upgrader ClusterUpgrader
 type ClusterUpgrader interface {
-	UpgradeCluster(upgradeConfig *upgradev1alpha1.UpgradeConfig, logger logr.Logger) error
+	UpgradeCluster(upgradeConfig *upgradev1alpha1.UpgradeConfig, logger logr.Logger) (*upgradev1alpha1.UpgradeConfig, error)
 }
 
 //go:generate mockgen -destination=mocks/cluster_upgrader_builder.go -package=mocks github.com/openshift/managed-upgrade-operator/pkg/cluster_upgrader ClusterUpgraderBuilder
@@ -97,7 +97,6 @@ func (cub *clusterUpgraderBuilder) NewClient(c client.Client) (ClusterUpgrader, 
 
 	once.Do(func() {
 		osdUpgradeSteps = map[upgradev1alpha1.UpgradeConditionType]UpgradeStep{
-			upgradev1alpha1.UpgradeValidated:              ValidateUpgradeConfig,
 			upgradev1alpha1.UpgradePreHealthCheck:         PreClusterHealthCheck,
 			upgradev1alpha1.UpgradeScaleUpExtraNodes:      EnsureExtraUpgradeWorkers,
 			upgradev1alpha1.ControlPlaneMaintWindow:       CreateControlPlaneMaintWindow,
@@ -515,27 +514,18 @@ func ControlPlaneUpgraded(c client.Client, m maintenance.Maintenance, upgradeCon
 }
 
 // This trigger the upgrade process
-func (cu clusterUpgrader) UpgradeCluster(upgradeConfig *upgradev1alpha1.UpgradeConfig, logger logr.Logger) error {
+func (cu clusterUpgrader) UpgradeCluster(upgradeConfig *upgradev1alpha1.UpgradeConfig, logger logr.Logger) (*upgradev1alpha1.UpgradeConfig, error) {
 
 	logger.Info("upgrading cluster")
 	history := upgradeConfig.Status.History.GetHistory(upgradeConfig.Spec.Desired.Version)
 	conditions := history.Conditions
-
-	if history.Phase != upgradev1alpha1.UpgradePhaseUpgrading {
-		history.Phase = upgradev1alpha1.UpgradePhaseUpgrading
-		history.StartTime = &metav1.Time{Time: time.Now()}
-		upgradeConfig.Status.History.SetHistory(*history)
-		err := cu.client.Status().Update(context.TODO(), upgradeConfig)
-		if err != nil {
-			logger.Error(err, "failed to update upgradeconfig")
-		}
-	}
 
 	for _, key := range Ordering() {
 
 		logger.Info(fmt.Sprintf("Perform %s", key))
 
 		condition := conditions.GetCondition(key)
+		// TODO: Do we need these condition start times (or the conditions at all) going by Meng Bos metrics work?
 		if condition == nil {
 			logger.Info(fmt.Sprintf("Adding %s condition", key))
 			condition = newUpgradeCondition(fmt.Sprintf("start %s", key), fmt.Sprintf("start %s", key), key, corev1.ConditionFalse)
@@ -543,10 +533,6 @@ func (cu clusterUpgrader) UpgradeCluster(upgradeConfig *upgradev1alpha1.UpgradeC
 			conditions.SetCondition(*condition)
 			history.Conditions = conditions
 			upgradeConfig.Status.History.SetHistory(*history)
-			err := cu.client.Status().Update(context.TODO(), upgradeConfig)
-			if err != nil {
-				return err
-			}
 		}
 		if condition.Status == corev1.ConditionTrue {
 			logger.Info(fmt.Sprintf("%s already done, skip", key))
@@ -561,11 +547,6 @@ func (cu clusterUpgrader) UpgradeCluster(upgradeConfig *upgradev1alpha1.UpgradeC
 			conditions.SetCondition(*condition)
 			history.Conditions = conditions
 			upgradeConfig.Status.History.SetHistory(*history)
-			err = cu.client.Status().Update(context.TODO(), upgradeConfig)
-			if err != nil {
-				return err
-			}
-			return err
 		}
 		if result {
 			condition.CompleteTime = &metav1.Time{Time: time.Now()}
@@ -575,10 +556,6 @@ func (cu clusterUpgrader) UpgradeCluster(upgradeConfig *upgradev1alpha1.UpgradeC
 			conditions.SetCondition(*condition)
 			history.Conditions = conditions
 			upgradeConfig.Status.History.SetHistory(*history)
-			err = cu.client.Status().Update(context.TODO(), upgradeConfig)
-			if err != nil {
-				return err
-			}
 		} else {
 			logger.Info(fmt.Sprintf("%s not done, skip following steps", key))
 			condition.Reason = fmt.Sprintf("%s not done", key)
@@ -586,21 +563,10 @@ func (cu clusterUpgrader) UpgradeCluster(upgradeConfig *upgradev1alpha1.UpgradeC
 			conditions.SetCondition(*condition)
 			history.Conditions = conditions
 			upgradeConfig.Status.History.SetHistory(*history)
-			err = cu.client.Status().Update(context.TODO(), upgradeConfig)
-			if err != nil {
-				return err
-			}
-			return nil
 		}
 	}
-	history.Phase = upgradev1alpha1.UpgradePhaseUpgraded
-	history.CompleteTime = &metav1.Time{Time: time.Now()}
-	upgradeConfig.Status.History.SetHistory(*history)
-	err := cu.client.Status().Update(context.TODO(), upgradeConfig)
-	if err != nil {
-		return err
-	}
-	return nil
+
+	return upgradeConfig, nil
 
 }
 
@@ -718,63 +684,56 @@ type AlertData struct {
 	Result []interface{} `json:"result"`
 }
 
-// TODO move to https://github.com/openshift/managed-cluster-validating-webhooks
+type ValidationError struct {
+	message string
+}
+
+func (ve *ValidationError) Error() string {
+	return ve.message
+}
+
 // validateUpgradeConfig will validate the UpgradeConfig, the desired version should be grater than or equal to the current version
-func ValidateUpgradeConfig(c client.Client, m maintenance.Maintenance, upgradeConfig *upgradev1alpha1.UpgradeConfig, logger logr.Logger) (result bool, err error) {
-
-	logger.Info("validating upgradeconfig")
-	clusterVersion := &configv1.ClusterVersion{}
-	err = c.Get(context.TODO(), types.NamespacedName{Name: "version"}, clusterVersion)
-	if err != nil {
-		logger.Info("failed to get clusterversion")
-		logger.Error(err, "failed to get clusterversion")
-		metrics.UpdateMetricValidationFailed(upgradeConfig.Name)
-		return false, err
-	}
-
+func IsValidUpgradeConfig(upgradeConfig *upgradev1alpha1.UpgradeConfig, cv *configv1.ClusterVersion) error {
 	//TODO get available version from ocm api like : ocm get "https://api.openshift.com/api/clusters_mgmt/v1/versions" --parameter search="enabled='t'"
+	// TODO: Is this still valid? ^
 
 	//Get current version, then compare
-	current := getCurrentVersion(clusterVersion)
-	logger.Info(fmt.Sprintf("current version is %s", current))
+	current := getCurrentVersion(cv)
 	if len(current) == 0 {
-		return false, fmt.Errorf("failed to get current version")
+		return &ValidationError{message: "Failed to get current version"}
 	}
 	// If the version match, it means it's already upgraded or at least control plane is upgraded.
 	if current == upgradeConfig.Spec.Desired.Version {
-		logger.Info("the expected version match current version")
 		metrics.UpdateMetricValidationFailed(upgradeConfig.Name)
-		return false, fmt.Errorf("cluster is already on version %s", current)
+		return &ValidationError{message: fmt.Sprintf("Cluster is already on version %s", current)}
 	}
 
 	// Compare the versions, if the current version is greater than desired, failed the validation, we don't support version rollback
 	versions := []string{current, upgradeConfig.Spec.Desired.Version}
-	logger.Info("compare two versions")
 	sort.Strings(versions)
 	if versions[0] != current {
-		logger.Info(fmt.Sprintf("validation failed, current version %s is greater than desired %s", current, upgradeConfig.Spec.Desired.Version))
 		metrics.UpdateMetricValidationFailed(upgradeConfig.Name)
-		return false, fmt.Errorf("desired version %s is greater than current version %s", upgradeConfig.Spec.Desired.Version, current)
+		return &ValidationError{message: fmt.Sprintf("desired version %s is greater than current version %s", upgradeConfig.Spec.Desired.Version, current)}
 	}
 
 	// Find the available versions from cincinnati
-	clusterId, err := uuid.Parse(string(clusterVersion.Spec.ClusterID))
+	clusterId, err := uuid.Parse(string(cv.Spec.ClusterID))
 	if err != nil {
-		return false, err
+		return err
 	}
-	upstreamURI, err := url.Parse(string(clusterVersion.Spec.Upstream))
+	upstreamURI, err := url.Parse(string(cv.Spec.Upstream))
 	if err != nil {
-		return false, err
+		return err
 	}
 	currentVersion, err := semver.Parse(current)
 	if err != nil {
-		return false, err
+		return err
 	}
 
 	updates, err := cincinnati.NewClient(clusterId, nil, nil).GetUpdates(upstreamURI, runtime.GOARCH, upgradeConfig.Spec.Desired.Channel, currentVersion)
 	if err != nil {
 		metrics.UpdateMetricValidationFailed(upgradeConfig.Name)
-		return false, err
+		return err
 	}
 
 	var cvoUpdates []configv1.Update
@@ -794,16 +753,15 @@ func ValidateUpgradeConfig(c client.Client, m maintenance.Maintenance, upgradeCo
 	}
 
 	if !found {
-		logger.Info(fmt.Sprintf("failed to find the desired version %s in channel %s", upgradeConfig.Spec.Desired.Version, upgradeConfig.Spec.Desired.Channel))
 		//We need update the condition
 		errMsg := fmt.Sprintf("cannot find version %s in available updates", upgradeConfig.Spec.Desired.Version)
 		metrics.UpdateMetricValidationFailed(upgradeConfig.Name)
-		return false, fmt.Errorf(errMsg)
+		return &ValidationError{message: fmt.Sprintf(errMsg)}
 	}
 
 	//Send the metrics for the validation passed
 	metrics.UpdateMetricValidationSucceeded(upgradeConfig.Name)
-	return true, nil
+	return nil
 }
 
 func getCurrentVersion(clusterVersion *configv1.ClusterVersion) string {
@@ -816,19 +774,14 @@ func getCurrentVersion(clusterVersion *configv1.ClusterVersion) string {
 }
 
 // This return the current upgrade status
-func IsClusterUpgrading(c client.Client, version string) (bool, error) {
-	clusterVersion := &configv1.ClusterVersion{}
-	err := c.Get(context.TODO(), types.NamespacedName{Name: "version"}, clusterVersion)
-	if err != nil {
-		return false, err
-	}
-	for _, c := range clusterVersion.Status.Conditions {
-		if c.Type == configv1.OperatorProgressing && c.Status == configv1.ConditionTrue && version != clusterVersion.Spec.DesiredUpdate.Version {
-			return true, nil
+func IsClusterUpgrading(cv *configv1.ClusterVersion, version string) bool {
+	for _, c := range cv.Status.Conditions {
+		if c.Type == configv1.OperatorProgressing && c.Status == configv1.ConditionTrue && version != cv.Spec.DesiredUpdate.Version {
+			return true
 
 		}
 	}
-	return false, nil
+	return false
 }
 
 func newUpgradeCondition(reason, msg string, conditionType upgradev1alpha1.UpgradeConditionType, s corev1.ConditionStatus) *upgradev1alpha1.UpgradeCondition {
@@ -841,6 +794,6 @@ func newUpgradeCondition(reason, msg string, conditionType upgradev1alpha1.Upgra
 }
 
 // TODO readyToUpgrade checks whether it's ready to upgrade based on the scheduling
-func IsReadyToUpgrade(upgradeConfig *upgradev1alpha1.UpgradeConfig) bool {
+func IsTimeToUpgrade(upgradeConfig *upgradev1alpha1.UpgradeConfig) bool {
 	return true
 }
