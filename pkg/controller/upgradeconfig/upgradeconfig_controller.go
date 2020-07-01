@@ -6,6 +6,7 @@ import (
 
 	upgradev1alpha1 "github.com/openshift/managed-upgrade-operator/pkg/apis/upgrade/v1alpha1"
 	"github.com/openshift/managed-upgrade-operator/pkg/cluster_upgrader"
+	"github.com/openshift/managed-upgrade-operator/pkg/validation"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -31,6 +32,7 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 		client:                 mgr.GetClient(),
 		scheme:                 mgr.GetScheme(),
 		clusterUpgraderBuilder: cluster_upgrader.NewBuilder(),
+		validationBuilder:      validation.NewBuilder(),
 	}
 }
 
@@ -47,6 +49,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -60,6 +63,7 @@ type ReconcileUpgradeConfig struct {
 	client                 client.Client
 	scheme                 *runtime.Scheme
 	clusterUpgraderBuilder cluster_upgrader.ClusterUpgraderBuilder
+	validationBuilder      validation.ValidationBuilder
 }
 
 // Reconcile reads that state of the cluster for a UpgradeConfig object and makes changes based on the state read
@@ -85,16 +89,17 @@ func (r *ReconcileUpgradeConfig) Reconcile(request reconcile.Request) (reconcile
 		return reconcile.Result{}, err
 	}
 
-	// If cluster is already upgrading with different version, we should wait until it completed
-	upgrading, err := cluster_upgrader.IsClusterUpgrading(r.client, instance.Spec.Desired.Version)
-	if err != nil {
-		return reconcile.Result{}, err
+	if !cluster_upgrader.IsEqualVersion(cv, instance) {
+		v, err := r.validationBuilder.NewClient(r.client)
+		ok, err := v.IsValidUpgradeConfig(instance, cv)
+		if err != nil {
+			return reconcile.Result{}, err
+		}
+		if !ok {
+			//	 send alert
+			return reconcile.Result{}, nil
+		}
 	}
-	if upgrading {
-		reqLogger.Info("cluster is upgrading with different version, cannot upgrade now")
-		return reconcile.Result{}, nil
-	}
-
 	var history upgradev1alpha1.UpgradeHistory
 	found := false
 	for _, h := range instance.Status.History {

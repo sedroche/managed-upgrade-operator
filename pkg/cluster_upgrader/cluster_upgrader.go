@@ -865,3 +865,13 @@ func newUpgradeCondition(reason, msg string, conditionType upgradev1alpha1.Upgra
 func IsReadyToUpgrade(upgradeConfig *upgradev1alpha1.UpgradeConfig) bool {
 	return true
 }
+
+func IsEqualVersion(cv *configv1.ClusterVersion, uc *upgradev1alpha1.UpgradeConfig) bool {
+	if cv.Spec.DesiredUpdate != nil &&
+		cv.Spec.DesiredUpdate.Version == uc.Spec.Desired.Version &&
+		cv.Spec.Channel == uc.Spec.Desired.Channel {
+		return true
+	}
+
+	return false
+}

@@ -62,6 +62,20 @@ var _ = Describe("UpgradeConfigController", func() {
 
 	Context("Reconcile", func() {
 
+		Context("When UpgradeConfig Validation fails", func() {
+			It("Upgrade should not proceed and an alert should be sent", func() {
+				_, err := reconciler.Reconcile(reconcile.Request{NamespacedName: upgradeConfigName})
+				Expect(err).To(HaveOccurred())
+			})
+		})
+
+		Context("When UpgradeConfig Validation succeeds", func() {
+			It("Upgrade should proceed and an alert should not be sent", func() {
+				_, err := reconciler.Reconcile(reconcile.Request{NamespacedName: upgradeConfigName})
+				Expect(err).NotTo(HaveOccurred())
+			})
+		})
+
 		Context("When an UpgradeConfig doesn't exist", func() {
 			JustBeforeEach(func() {
 				notFound := k8serrs.NewNotFound(schema.GroupResource{}, upgradeConfigName.Name)
