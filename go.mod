@@ -10,7 +10,6 @@ require (
 	github.com/go-openapi/runtime v0.19.4
 	github.com/go-openapi/strfmt v0.19.3
 	github.com/golang/mock v1.3.1
-	github.com/golang/protobuf v1.4.1 // indirect
 	github.com/google/uuid v1.1.1
 	github.com/hashicorp/go-multierror v1.1.0
 	github.com/onsi/ginkgo v1.12.0
@@ -25,8 +24,7 @@ require (
 	github.com/prometheus/client_golang v1.5.1
 	github.com/spf13/pflag v1.0.5
 	github.com/vincent-petithory/dataurl v0.0.0-20191104211930-d1553a71de50 // indirect
-	golang.org/x/net v0.0.0-20200506145744-7e3656a0809f // indirect
-	golang.org/x/sys v0.0.0-20200509044756-6aff5f38e54f // indirect
+	golang.org/x/sys v0.0.0-20200625212154-ddb9806d33ae // indirect
 	golang.org/x/tools v0.0.0-20200522201501-cb1345f3a375 // indirect
 	k8s.io/api v0.18.3
 	k8s.io/apimachinery v0.18.3

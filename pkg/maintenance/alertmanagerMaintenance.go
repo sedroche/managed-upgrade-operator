@@ -2,18 +2,19 @@ package maintenance
 
 import (
 	"context"
-	"github.com/hashicorp/go-multierror"
+	"strings"
+	"time"
+
 	"github.com/go-openapi/runtime"
 	httptransport "github.com/go-openapi/runtime/client"
 	"github.com/go-openapi/strfmt"
+	"github.com/hashicorp/go-multierror"
 	routev1 "github.com/openshift/api/route/v1"
 	"github.com/openshift/managed-upgrade-operator/config"
 	amv2Models "github.com/prometheus/alertmanager/api/v2/models"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"strings"
-	"time"
 )
 
 var (
@@ -96,13 +97,13 @@ func getAuthentication(c client.Client) (runtime.ClientAuthInfoWriter, error) {
 func (amm *alertManagerMaintenance) StartControlPlane(endsAt time.Time) error {
 	now := strfmt.DateTime(time.Now().UTC())
 	end := strfmt.DateTime(endsAt.UTC())
-	err := amm.client.create(createDefaultMatchers(), now, end, config.OperatorName, "Silence for OSD upgrade")
+	err := amm.client.Create(createDefaultMatchers(), now, end, config.OperatorName, "Silence for OSD upgrade")
 	if err != nil {
 		return err
 	}
 
 	matchers := []*amv2Models.Matcher{createMatcher("alertname", controlPlaneIgnoredCriticalAlerts, true)}
-	err = amm.client.create(matchers, now, end, config.OperatorName, "Silence for OSD upgrade")
+	err = amm.client.Create(matchers, now, end, config.OperatorName, "Silence for OSD upgrade")
 	if err != nil {
 		return err
 	}
@@ -115,7 +116,7 @@ func (amm *alertManagerMaintenance) StartControlPlane(endsAt time.Time) error {
 func (amm *alertManagerMaintenance) StartWorker(endsAt time.Time) error {
 	now := strfmt.DateTime(time.Now().UTC())
 	end := strfmt.DateTime(endsAt.UTC())
-	err := amm.client.create(createDefaultMatchers(), now, end, config.OperatorName, "Silence for OSD upgrade")
+	err := amm.client.Create(createDefaultMatchers(), now, end, config.OperatorName, "Silence for OSD upgrade")
 	if err != nil {
 		return err
 	}

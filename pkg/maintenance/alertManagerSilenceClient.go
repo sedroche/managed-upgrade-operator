@@ -2,19 +2,27 @@ package maintenance
 
 import (
 	"context"
+	"net/http"
+
 	httptransport "github.com/go-openapi/runtime/client"
 	"github.com/go-openapi/strfmt"
 	amSilence "github.com/prometheus/alertmanager/api/v2/client/silence"
 	amv2Models "github.com/prometheus/alertmanager/api/v2/models"
-	"net/http"
 )
+
+//go:generate mockgen -destination=mocks/alertManagerSilenceClient.go -package=mocks github.com/openshift/managed-upgrade-operator/pkg/maintenance AlertManagerSilencer
+type AlertManagerSilencer interface {
+	Create(matchers amv2Models.Matchers, startsAt strfmt.DateTime, endsAt strfmt.DateTime, creator string, comment string) error
+	List(filter []string) (*amSilence.GetSilencesOK, error)
+	Delete(id string) error
+}
 
 type alertManagerSilenceClient struct {
 	transport *httptransport.Runtime
 }
 
 // Creates a silence in Alertmanager instance defined in transport
-func (ams *alertManagerSilenceClient) create(matchers amv2Models.Matchers, startsAt strfmt.DateTime, endsAt strfmt.DateTime, creator string, comment string) error {
+func (ams *alertManagerSilenceClient) Create(matchers amv2Models.Matchers, startsAt strfmt.DateTime, endsAt strfmt.DateTime, creator string, comment string) error {
 	pParams := &amSilence.PostSilencesParams{
 		Silence: &amv2Models.PostableSilence{
 			Silence: amv2Models.Silence{
