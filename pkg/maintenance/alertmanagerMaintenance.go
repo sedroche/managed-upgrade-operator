@@ -43,14 +43,14 @@ func (ammb *alertManagerMaintenanceBuilder) NewClient(client client.Client) (Mai
 	}
 
 	return &alertManagerMaintenance{
-		client: alertManagerSilenceClient{
+		client: &alertManagerSilenceClient{
 			transport: transport,
 		},
 	}, nil
 }
 
 type alertManagerMaintenance struct {
-	client alertManagerSilenceClient
+	client AlertManagerSilence
 }
 
 func getTransport(c client.Client) (*httptransport.Runtime, error) {

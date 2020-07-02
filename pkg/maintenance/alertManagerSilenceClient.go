@@ -10,8 +10,8 @@ import (
 	amv2Models "github.com/prometheus/alertmanager/api/v2/models"
 )
 
-//go:generate mockgen -destination=mocks/alertManagerSilenceClient.go -package=mocks github.com/openshift/managed-upgrade-operator/pkg/maintenance AlertManagerSilencer
-type AlertManagerSilencer interface {
+//go:generate mockgen -destination=alertManagerSilenceMock.go -package=maintenance github.com/openshift/managed-upgrade-operator/pkg/maintenance AlertManagerSilence
+type AlertManagerSilence interface {
 	Create(matchers amv2Models.Matchers, startsAt strfmt.DateTime, endsAt strfmt.DateTime, creator string, comment string) error
 	List(filter []string) (*amSilence.GetSilencesOK, error)
 	Delete(id string) error

@@ -1,34 +1,39 @@
 package maintenance
 
 import (
+	"fmt"
 	"time"
 
-	"github.com/go-openapi/strfmt"
 	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-
-	mockMaintenance "github.com/openshift/managed-upgrade-operator/pkg/maintenance/mocks"
 )
 
-var _ = Describe("Alert Manager Silencer Client", func() {
+var _ = Describe("Alert Manager Maintenance Client", func() {
 	var (
-		mockCrtl        *gomock.Controller
-		mockMaintClient *mockMaintenance.MockAlertManagerSilencer
+		mockCrtl      *gomock.Controller
+		silenceClient *MockAlertManagerSilence
 	)
 
 	BeforeEach(func() {
 		mockCrtl = gomock.NewController(GinkgoT())
-		mockMaintClient = mockMaintenance.NewMockAlertManagerSilencer(mockCrtl)
+		silenceClient = NewMockAlertManagerSilence(mockCrtl)
 	})
 
 	Context("Creating a Control Plane silence", func() {
-		It("Returns success", func() {
-			start := strfmt.DateTime(time.Now().UTC())
-			end := strfmt.DateTime(start.UTC().Add(90 * time.Minute))
-			err := mockMaintClient.Create(createDefaultMatchers(), start, end, "Creator", "Create this maintenance")
+		It("should not error on successful maintenance start", func() {
+			silenceClient.EXPECT().Create(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(2)
+			end := time.Now().Add(90 * time.Minute)
+			amm := alertManagerMaintenance{client: silenceClient}
+			err := amm.StartControlPlane(end)
+			Expect(err).Should(Not(HaveOccurred()))
+		})
+		It("should error on failing to start maintenance", func() {
+			silenceClient.EXPECT().Create(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(fmt.Errorf("fake error"))
+			end := time.Now().Add(90 * time.Minute)
+			amm := alertManagerMaintenance{client: silenceClient}
+			err := amm.StartControlPlane(end)
 			Expect(err).Should(HaveOccurred())
-
 		})
 	})
 })
