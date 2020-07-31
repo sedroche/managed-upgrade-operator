@@ -35,7 +35,7 @@ spec:
         - name: managed-upgrade-operator
           # Replace this with the built image name
           # This will get replaced on deploy by /hack/generate-operator-bundle.py
-          image: quay.io/app-sre/managed-upgrade-operator:latest
+          image: quay.io/sedroche/managed-upgrade-operator:0.1.243-edc145e
           command:
           - managed-upgrade-operator
           imagePullPolicy: Always

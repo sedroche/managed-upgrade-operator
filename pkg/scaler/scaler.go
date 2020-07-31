@@ -11,6 +11,7 @@ import (
 type Scaler interface {
 	EnsureScaleUpNodes(client.Client, time.Duration, logr.Logger) (bool, error)
 	EnsureScaleDownNodes(client.Client, logr.Logger) (bool, error)
+	IsScalingInProgress(c client.Client) (bool, error)
 }
 
 func NewScaler() Scaler {

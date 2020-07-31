@@ -18,16 +18,21 @@ const (
 	LABEL_UPGRADE = "upgrade.managed.openshift.io"
 )
 
+// TODO: error-ing in pre cluster check blocks re-running scale nodes
 type machineSetScaler struct{}
 
-// This will create a new MachineSet with 1 extra replicas for workers in every region and report when the nodes are ready.
-func (s *machineSetScaler) EnsureScaleUpNodes(c client.Client, timeOut time.Duration, logger logr.Logger) (bool, error) {
+func getUpgradeMachineSet(c client.Client) (*machineapi.MachineSetList, error) {
 	upgradeMachinesets := &machineapi.MachineSetList{}
-
 	err := c.List(context.TODO(), upgradeMachinesets, []client.ListOption{
 		client.InNamespace("openshift-machine-api"),
 		client.MatchingLabels{LABEL_UPGRADE: "true"},
 	}...)
+	return upgradeMachinesets, err
+}
+
+// This will create a new MachineSet with 1 extra replicas for workers in every region and report when the nodes are ready.
+func (s *machineSetScaler) EnsureScaleUpNodes(c client.Client, timeOut time.Duration, logger logr.Logger) (bool, error) {
+	upgradeMachinesets, err := getUpgradeMachineSet(c)
 	if err != nil {
 		logger.Error(err, "failed to get upgrade extra machinesets")
 		return false, err
@@ -99,7 +104,9 @@ func (s *machineSetScaler) EnsureScaleUpNodes(c client.Client, timeOut time.Dura
 		startTime := ms.CreationTimestamp
 		if ms.Status.Replicas != ms.Status.ReadyReplicas {
 
-			if time.Now().After(startTime.Time.Add(timeOut)) {
+			logger.Info(fmt.Sprintf("now time is:%s", time.Now().String()))
+			logger.Info(fmt.Sprintf("startime time is:%s", startTime.String()))
+			if time.Now().After(startTime.Time.Add(timeOut * time.Minute)) {
 				return false, NewScaleTimeOutError(fmt.Sprintf("Machineset %s provisioning timout", ms.Name))
 			}
 			logger.Info(fmt.Sprintf("not all machines are ready for machineset:%s", ms.Name))
@@ -197,6 +204,15 @@ func (s *machineSetScaler) EnsureScaleDownNodes(c client.Client, logger logr.Log
 	}
 
 	return true, nil
+}
+
+// This will return true if scaling is in progress
+func (s *machineSetScaler) IsScalingInProgress(c client.Client) (bool, error) {
+	ums, err := getUpgradeMachineSet(c)
+	if err != nil {
+		return false, err
+	}
+	return len(ums.Items) > 0, nil
 }
 
 type NotMatchingLabels map[string]string

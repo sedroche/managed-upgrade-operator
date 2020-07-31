@@ -107,13 +107,12 @@ type osdClusterUpgrader struct {
 
 // PreClusterHealthCheck performs cluster healthy check
 func PreClusterHealthCheck(c client.Client, cfg *osdUpgradeConfig, scaler scaler.Scaler, metricsClient metrics.Metrics, m maintenance.Maintenance, upgradeConfig *upgradev1alpha1.UpgradeConfig, logger logr.Logger) (bool, error) {
-	upgradeCommenced, err := hasUpgradeCommenced(c, upgradeConfig)
+	scalingInProgress, err := scaler.IsScalingInProgress(c)
 	if err != nil {
 		return false, err
 	}
-	desired := upgradeConfig.Spec.Desired
-	if upgradeCommenced {
-		logger.Info(fmt.Sprintf("ClusterVersion is already set to Channel %s Version %s, skipping %s", desired.Channel, desired.Version, upgradev1alpha1.UpgradePreHealthCheck))
+	if scalingInProgress {
+		logger.Info(fmt.Sprintf("Scaling is already in progress skipping %s", upgradev1alpha1.UpgradePreHealthCheck))
 		return true, nil
 	}
 

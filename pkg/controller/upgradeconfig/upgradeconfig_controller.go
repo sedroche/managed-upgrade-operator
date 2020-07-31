@@ -194,6 +194,7 @@ func (r *ReconcileUpgradeConfig) Reconcile(request reconcile.Request) (reconcile
 		} else {
 			history.Phase = upgradev1alpha1.UpgradePhasePending
 			instance.Status.History.SetHistory(history)
+			// TODO add condition
 			err = r.client.Status().Update(context.TODO(), instance)
 			if err != nil {
 				return reconcile.Result{}, err
