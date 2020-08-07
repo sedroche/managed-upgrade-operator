@@ -18,3 +18,9 @@ data:
       timeOut: 60
     nodeDrain:
       timeOut: 45
+    healthCheck:
+      ignoredCriticals:
+      - ClusterUpgradingSRE
+      - DNSErrors05MinSRE
+      - MetricsClientSendFailingSRE
+      - UpgradeNodeScalingFailedSRE

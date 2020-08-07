@@ -11,6 +11,11 @@ type osdUpgradeConfig struct {
 	Maintenance maintenance.MaintenanceConfig `yaml:"maintenance"`
 	Scale       scaleConfig                   `yaml:"scale"`
 	NodeDrain   nodeDrain                     `yaml:"nodeDrain"`
+	HealthCheck healthCheck                   `yaml:"healthCheck"`
+}
+
+type healthCheck struct {
+	IgnoredCriticals []string `yaml:"ignoredCriticals"`
 }
 
 type scaleConfig struct {
