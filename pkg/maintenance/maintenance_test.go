@@ -31,6 +31,7 @@ var _ = Describe("Alert Manager Maintenance Client", func() {
 		testEnd               = strfmt.DateTime(time.Now().UTC().Add(90 * time.Minute))
 		testVersion           = "V-1.million.25"
 		testGettableSilences  amv2Models.GettableSilences
+		cfg                   MaintenanceConfig
 
 		// Create test silence created by the operator
 		testSilence = amv2Models.Silence{
@@ -50,6 +51,12 @@ var _ = Describe("Alert Manager Maintenance Client", func() {
 		mockCtrl = gomock.NewController(GinkgoT())
 		silenceClient = NewMockAlertManagerSilencer(mockCtrl)
 		mockKubeClient = mocks.NewMockClient(mockCtrl)
+		cfg = MaintenanceConfig{
+			ControlPlaneTime: 90,
+			WorkerNodeTime:   8,
+			IgnoredAlerts: ignoredAlerts{
+				ControlPlaneCriticals: []string{"alertToIgnore"}},
+		}
 	})
 
 	AfterEach(func() {
@@ -61,17 +68,15 @@ var _ = Describe("Alert Manager Maintenance Client", func() {
 		It("Should not error on successfull maintenance start", func() {
 			silenceClient.EXPECT().Create(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(2)
 			silenceClient.EXPECT().List(gomock.Any()).Return(&testActiveSilences, nil)
-			end := time.Now().Add(90 * time.Minute)
-			amm := alertManagerMaintenance{client: silenceClient}
-			err := amm.StartControlPlane(end, testVersion)
+			amm := alertManagerMaintenance{client: silenceClient, cfg: cfg}
+			err := amm.StartControlPlane(testVersion)
 			Expect(err).Should(Not(HaveOccurred()))
 		})
 		It("Should error on failing to start maintenance", func() {
 			silenceClient.EXPECT().Create(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(fmt.Errorf("fake error"))
 			silenceClient.EXPECT().List(gomock.Any()).Return(&testActiveSilences, nil)
-			end := time.Now().Add(90 * time.Minute)
-			amm := alertManagerMaintenance{client: silenceClient}
-			err := amm.StartControlPlane(end, testVersion)
+			amm := alertManagerMaintenance{client: silenceClient, cfg: cfg}
+			err := amm.StartControlPlane(testVersion)
 			Expect(err).Should(HaveOccurred())
 		})
 	})
@@ -81,17 +86,15 @@ var _ = Describe("Alert Manager Maintenance Client", func() {
 		It("Should not error on successfull maintenance start", func() {
 			silenceClient.EXPECT().Create(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 			silenceClient.EXPECT().List(gomock.Any()).Return(&testActiveSilences, nil)
-			end := time.Now().Add(90 * time.Minute)
-			amm := alertManagerMaintenance{client: silenceClient}
-			err := amm.StartWorker(end, testVersion)
+			amm := alertManagerMaintenance{client: silenceClient, cfg: cfg}
+			err := amm.StartWorker(2, testVersion)
 			Expect(err).Should(Not(HaveOccurred()))
 		})
 		It("Should error on failing to start maintenance", func() {
 			silenceClient.EXPECT().Create(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(fmt.Errorf("fake error"))
 			silenceClient.EXPECT().List(gomock.Any()).Return(&testActiveSilences, nil)
-			end := time.Now().Add(90 * time.Minute)
-			amm := alertManagerMaintenance{client: silenceClient}
-			err := amm.StartWorker(end, testVersion)
+			amm := alertManagerMaintenance{client: silenceClient, cfg: cfg}
+			err := amm.StartWorker(2, testVersion)
 			Expect(err).Should(HaveOccurred())
 		})
 	})
@@ -166,7 +169,7 @@ var _ = Describe("Alert Manager Maintenance Client", func() {
 			mockKubeClient.EXPECT().Get(context.TODO(), types.NamespacedName{Namespace: alertManagerNamespace, Name: alertManagerRouteName}, mockAmRoute)
 			mockKubeClient.EXPECT().List(context.TODO(), mockSecretList, &client.ListOptions{Namespace: alertManagerNamespace})
 
-			_, err := ammb.NewClient(mockKubeClient)
+			_, err := ammb.NewClient(mockKubeClient, cfg)
 			Expect(err).ShouldNot(HaveOccurred())
 		})
 	})
