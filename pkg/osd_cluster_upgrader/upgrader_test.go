@@ -291,8 +291,6 @@ var _ = Describe("ClusterUpgrader", func() {
 					mockKubeClient.EXPECT().List(gomock.Any(), gomock.Any()).Times(2),
 					mockKubeClient.EXPECT().Get(gomock.Any(), types.NamespacedName{Name: "worker"}, gomock.Any()).SetArg(2, *configPool),
 					mockMaintClient.EXPECT().IsActive(),
-					mockMetricsClient.EXPECT().IsMetricNodeUpgradeEndTimeSet(upgradeConfig.Name, upgradeConfig.Spec.Desired.Version),
-					mockMetricsClient.EXPECT().UpdateMetricNodeUpgradeEndTime(gomock.Any(), upgradeConfig.Name, upgradeConfig.Spec.Desired.Version),
 					mockMetricsClient.EXPECT().ResetMetricUpgradeWorkerTimeout(upgradeConfig.Name, upgradeConfig.Spec.Desired.Version),
 				)
 				result, err := AllWorkersUpgraded(mockKubeClient, config, mockScalerClient, mockMetricsClient, mockMaintClient, upgradeConfig, logger)

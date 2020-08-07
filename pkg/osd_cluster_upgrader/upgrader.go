@@ -264,13 +264,6 @@ func AllWorkersUpgraded(c client.Client, cfg *osdUpgradeConfig, scaler scaler.Sc
 		return false, nil
 	}
 
-	isSet, err := metricsClient.IsMetricNodeUpgradeEndTimeSet(upgradeConfig.Name, upgradeConfig.Spec.Desired.Version)
-	if err != nil {
-		return false, err
-	}
-	if !isSet {
-		metricsClient.UpdateMetricNodeUpgradeEndTime(time.Now(), upgradeConfig.Name, upgradeConfig.Spec.Desired.Version)
-	}
 	metricsClient.ResetMetricUpgradeWorkerTimeout(upgradeConfig.Name, upgradeConfig.Spec.Desired.Version)
 	return true, nil
 }
