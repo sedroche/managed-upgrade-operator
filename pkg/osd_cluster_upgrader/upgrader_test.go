@@ -3,7 +3,6 @@ package osd_cluster_upgrader
 import (
 	"context"
 	"fmt"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -13,6 +12,7 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	machineconfigapi "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -80,7 +80,7 @@ var _ = Describe("ClusterUpgrader", func() {
 				WorkerNodeTime:   8,
 				ControlPlaneTime: 90,
 			},
-			Scale: scaleConfig{
+			Scale: scaler.ScaleConfig{
 				TimeOut: 30,
 			},
 		}
@@ -162,7 +162,7 @@ var _ = Describe("ClusterUpgrader", func() {
 
 	Context("Scaling", func() {
 		It("Should scale up extra nodes and set success metric on successful scaling", func() {
-			mockScalerClient.EXPECT().EnsureScaleUpNodes(gomock.Any(), config.GetScaleDuration(), gomock.Any()).Return(true, nil)
+			mockScalerClient.EXPECT().EnsureScaleUpNodes(gomock.Any(), gomock.Any()).Return(true, nil)
 			mockMetricsClient.EXPECT().UpdateMetricScalingSucceeded(gomock.Any())
 			expectUpgradeHasNotCommenced(mockKubeClient, upgradeConfig, nil)
 			ok, err := EnsureExtraUpgradeWorkers(mockKubeClient, config, mockScalerClient, mockMetricsClient, mockMaintClient, upgradeConfig, logger)
@@ -170,7 +170,7 @@ var _ = Describe("ClusterUpgrader", func() {
 			Expect(ok).To(BeTrue())
 		})
 		It("Should set failed metric on scaling time out", func() {
-			mockScalerClient.EXPECT().EnsureScaleUpNodes(gomock.Any(), config.GetScaleDuration(), gomock.Any()).Return(false, scaler.NewScaleTimeOutError("test scale timed out"))
+			mockScalerClient.EXPECT().EnsureScaleUpNodes(gomock.Any(), gomock.Any()).Return(false, scaler.NewScaleTimeOutError("test scale timed out"))
 			mockMetricsClient.EXPECT().UpdateMetricScalingFailed(gomock.Any())
 			expectUpgradeHasNotCommenced(mockKubeClient, upgradeConfig, nil)
 			ok, err := EnsureExtraUpgradeWorkers(mockKubeClient, config, mockScalerClient, mockMetricsClient, mockMaintClient, upgradeConfig, logger)

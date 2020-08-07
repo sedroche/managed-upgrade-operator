@@ -89,7 +89,7 @@ func NewClient(c client.Client, cfm configmanager.ConfigManager, mc metrics.Metr
 		client:      c,
 		maintenance: m,
 		metrics:     mc,
-		scaler:      scaler.NewScaler(),
+		scaler:      scaler.NewScaler(cfg.Scale),
 		cfg:         cfg,
 	}, nil
 }
@@ -139,7 +139,7 @@ func EnsureExtraUpgradeWorkers(c client.Client, cfg *osdUpgradeConfig, s scaler.
 		return true, nil
 	}
 
-	isScaled, err := s.EnsureScaleUpNodes(c, cfg.GetScaleDuration(), logger)
+	isScaled, err := s.EnsureScaleUpNodes(c, logger)
 	if err != nil {
 		if scaler.IsScaleTimeOutError(err) {
 			metricsClient.UpdateMetricScalingFailed(upgradeConfig.Name)

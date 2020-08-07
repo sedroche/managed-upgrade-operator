@@ -16,6 +16,7 @@ import (
 	mockMaintenance "github.com/openshift/managed-upgrade-operator/pkg/maintenance/mocks"
 	"github.com/openshift/managed-upgrade-operator/pkg/metrics"
 	mockMetrics "github.com/openshift/managed-upgrade-operator/pkg/metrics/mocks"
+	"github.com/openshift/managed-upgrade-operator/pkg/scaler"
 	mockScaler "github.com/openshift/managed-upgrade-operator/pkg/scaler/mocks"
 	"github.com/openshift/managed-upgrade-operator/util/mocks"
 	testStructs "github.com/openshift/managed-upgrade-operator/util/mocks/structs"
@@ -56,7 +57,7 @@ var _ = Describe("ClusterUpgrader verification and health tests", func() {
 				WorkerNodeTime:   8,
 				ControlPlaneTime: 90,
 			},
-			Scale: scaleConfig{
+			Scale: scaler.ScaleConfig{
 				TimeOut: 30,
 			},
 			HealthCheck: healthCheck{

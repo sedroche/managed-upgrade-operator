@@ -18,10 +18,12 @@ const (
 	LABEL_UPGRADE = "upgrade.managed.openshift.io"
 )
 
-type machineSetScaler struct{}
+type machineSetScaler struct {
+	cfg ScaleConfig
+}
 
 // This will create a new MachineSet with 1 extra replicas for workers in every region and report when the nodes are ready.
-func (s *machineSetScaler) EnsureScaleUpNodes(c client.Client, timeOut time.Duration, logger logr.Logger) (bool, error) {
+func (s *machineSetScaler) EnsureScaleUpNodes(c client.Client, logger logr.Logger) (bool, error) {
 	upgradeMachinesets := &machineapi.MachineSetList{}
 
 	err := c.List(context.TODO(), upgradeMachinesets, []client.ListOption{
@@ -99,7 +101,7 @@ func (s *machineSetScaler) EnsureScaleUpNodes(c client.Client, timeOut time.Dura
 		startTime := ms.CreationTimestamp
 		if ms.Status.Replicas != ms.Status.ReadyReplicas {
 
-			if time.Now().After(startTime.Time.Add(timeOut)) {
+			if time.Now().After(startTime.Time.Add(s.cfg.GetScaleDuration())) {
 				return false, NewScaleTimeOutError(fmt.Sprintf("Machineset %s provisioning timout", ms.Name))
 			}
 			logger.Info(fmt.Sprintf("not all machines are ready for machineset:%s", ms.Name))
@@ -130,7 +132,7 @@ func (s *machineSetScaler) EnsureScaleUpNodes(c client.Client, timeOut time.Dura
 		}
 		if !nodeReady {
 			allNodeReady = false
-			if time.Now().After(startTime.Time.Add(timeOut)) {
+			if time.Now().After(startTime.Time.Add(s.cfg.GetScaleDuration())) {
 				logger.Info("node is not ready within timeout time")
 				return false, NewScaleTimeOutError(fmt.Sprintf("Timeout waiting for node:%s to become ready", nodeName))
 			}
