@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	upgradev1alpha1 "github.com/openshift/managed-upgrade-operator/pkg/apis/upgrade/v1alpha1"
+	"github.com/openshift/managed-upgrade-operator/pkg/maintenance"
 	mockMaintenance "github.com/openshift/managed-upgrade-operator/pkg/maintenance/mocks"
 	"github.com/openshift/managed-upgrade-operator/pkg/metrics"
 	mockMetrics "github.com/openshift/managed-upgrade-operator/pkg/metrics/mocks"
@@ -51,7 +52,7 @@ var _ = Describe("ClusterUpgrader verification and health tests", func() {
 		logger = logf.Log.WithName("cluster upgrader test logger")
 		stepCounter = make(map[upgradev1alpha1.UpgradeConditionType]int)
 		config = &osdUpgradeConfig{
-			Maintenance: maintenanceConfig{
+			Maintenance: maintenance.MaintenanceConfig{
 				WorkerNodeTime:   8,
 				ControlPlaneTime: 90,
 			},

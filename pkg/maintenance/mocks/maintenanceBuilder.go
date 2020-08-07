@@ -35,16 +35,16 @@ func (m *MockMaintenanceBuilder) EXPECT() *MockMaintenanceBuilderMockRecorder {
 }
 
 // NewClient mocks base method
-func (m *MockMaintenanceBuilder) NewClient(arg0 client.Client) (maintenance.Maintenance, error) {
+func (m *MockMaintenanceBuilder) NewClient(arg0 client.Client, arg1 maintenance.MaintenanceConfig) (maintenance.Maintenance, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "NewClient", arg0)
+	ret := m.ctrl.Call(m, "NewClient", arg0, arg1)
 	ret0, _ := ret[0].(maintenance.Maintenance)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // NewClient indicates an expected call of NewClient
-func (mr *MockMaintenanceBuilderMockRecorder) NewClient(arg0 interface{}) *gomock.Call {
+func (mr *MockMaintenanceBuilderMockRecorder) NewClient(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewClient", reflect.TypeOf((*MockMaintenanceBuilder)(nil).NewClient), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewClient", reflect.TypeOf((*MockMaintenanceBuilder)(nil).NewClient), arg0, arg1)
 }

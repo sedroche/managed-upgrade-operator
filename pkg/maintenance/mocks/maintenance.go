@@ -7,7 +7,6 @@ package mocks
 import (
 	gomock "github.com/golang/mock/gomock"
 	reflect "reflect"
-	time "time"
 )
 
 // MockMaintenance is a mock of Maintenance interface
@@ -63,21 +62,21 @@ func (mr *MockMaintenanceMockRecorder) IsActive() *gomock.Call {
 }
 
 // StartControlPlane mocks base method
-func (m *MockMaintenance) StartControlPlane(arg0 time.Time, arg1 string) error {
+func (m *MockMaintenance) StartControlPlane(arg0 string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "StartControlPlane", arg0, arg1)
+	ret := m.ctrl.Call(m, "StartControlPlane", arg0)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // StartControlPlane indicates an expected call of StartControlPlane
-func (mr *MockMaintenanceMockRecorder) StartControlPlane(arg0, arg1 interface{}) *gomock.Call {
+func (mr *MockMaintenanceMockRecorder) StartControlPlane(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StartControlPlane", reflect.TypeOf((*MockMaintenance)(nil).StartControlPlane), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StartControlPlane", reflect.TypeOf((*MockMaintenance)(nil).StartControlPlane), arg0)
 }
 
 // StartWorker mocks base method
-func (m *MockMaintenance) StartWorker(arg0 time.Time, arg1 string) error {
+func (m *MockMaintenance) StartWorker(arg0 int, arg1 string) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "StartWorker", arg0, arg1)
 	ret0, _ := ret[0].(error)

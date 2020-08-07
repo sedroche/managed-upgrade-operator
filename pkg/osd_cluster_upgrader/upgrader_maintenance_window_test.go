@@ -13,6 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
+	"github.com/openshift/managed-upgrade-operator/pkg/maintenance"
 	mockMaintenance "github.com/openshift/managed-upgrade-operator/pkg/maintenance/mocks"
 	mockMetrics "github.com/openshift/managed-upgrade-operator/pkg/metrics/mocks"
 	mockScaler "github.com/openshift/managed-upgrade-operator/pkg/scaler/mocks"
@@ -45,7 +46,7 @@ var _ = Describe("ClusterUpgrader maintenance window tests", func() {
 		logger = logf.Log.WithName("cluster upgrader test logger")
 		stepCounter = make(map[upgradev1alpha1.UpgradeConditionType]int)
 		config = &osdUpgradeConfig{
-			Maintenance: maintenanceConfig{
+			Maintenance: maintenance.MaintenanceConfig{
 				WorkerNodeTime:   8,
 				ControlPlaneTime: 90,
 			},
@@ -76,13 +77,13 @@ var _ = Describe("ClusterUpgrader maintenance window tests", func() {
 
 	Context("When creating a control plane maintenance window", func() {
 		It("Asks the maintenance client to do so", func() {
-			mockMaintClient.EXPECT().StartControlPlane(gomock.Any(), upgradeConfig.Spec.Desired.Version)
+			mockMaintClient.EXPECT().StartControlPlane(upgradeConfig.Spec.Desired.Version)
 			result, err := CreateControlPlaneMaintWindow(mockKubeClient, config, mockScaler, mockMetricsClient, mockMaintClient, upgradeConfig, logger)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(result).To(BeTrue())
 		})
 		It("Indicates when creating the maintenance window has failed", func() {
-			mockMaintClient.EXPECT().StartControlPlane(gomock.Any(), upgradeConfig.Spec.Desired.Version).Return(fmt.Errorf("fake error"))
+			mockMaintClient.EXPECT().StartControlPlane(upgradeConfig.Spec.Desired.Version).Return(fmt.Errorf("fake error"))
 			result, err := CreateControlPlaneMaintWindow(mockKubeClient, config, mockScaler, mockMetricsClient, mockMaintClient, upgradeConfig, logger)
 			Expect(err).To(HaveOccurred())
 			Expect(result).To(BeFalse())

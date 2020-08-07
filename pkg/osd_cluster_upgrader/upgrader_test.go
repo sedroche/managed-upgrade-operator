@@ -76,7 +76,7 @@ var _ = Describe("ClusterUpgrader", func() {
 		logger = logf.Log.WithName("cluster upgrader test logger")
 		stepCounter = make(map[upgradev1alpha1.UpgradeConditionType]int)
 		config = &osdUpgradeConfig{
-			Maintenance: maintenanceConfig{
+			Maintenance: maintenance.MaintenanceConfig{
 				WorkerNodeTime:   8,
 				ControlPlaneTime: 90,
 			},

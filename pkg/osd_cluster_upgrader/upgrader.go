@@ -433,7 +433,7 @@ func ControlPlaneUpgraded(c client.Client, cfg *osdUpgradeConfig, scaler scaler.
 		}
 	}
 
-	upgradeTimeout := cfg.GetControlPlaneDuration()
+	upgradeTimeout := cfg.Maintenance.GetControlPlaneDuration()
 	if !upgradeStartTime.IsZero() && controlPlaneCompleteTime == nil && time.Now().After(upgradeStartTime.Add(upgradeTimeout)) {
 		logger.Info("Control plane upgrade timeout")
 		metricsClient.UpdateMetricUpgradeControlPlaneTimeout(upgradeConfig.Name, upgradeConfig.Spec.Desired.Version)
