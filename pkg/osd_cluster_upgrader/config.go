@@ -3,17 +3,14 @@ package osd_cluster_upgrader
 import (
 	"fmt"
 	"time"
+
+	"github.com/openshift/managed-upgrade-operator/pkg/maintenance"
 )
 
 type osdUpgradeConfig struct {
-	Maintenance maintenanceConfig `yaml:"maintenance"`
-	Scale       scaleConfig       `yaml:"scale"`
-	NodeDrain   nodeDrain         `yaml:"nodeDrain"`
-}
-
-type maintenanceConfig struct {
-	ControlPlaneTime int `yaml:"controlPlaneTime"`
-	WorkerNodeTime   int `yaml:"workerNodeTime"`
+	Maintenance maintenance.MaintenanceConfig `yaml:"maintenance"`
+	Scale       scaleConfig                   `yaml:"scale"`
+	NodeDrain   nodeDrain                     `yaml:"nodeDrain"`
 }
 
 type scaleConfig struct {
@@ -25,11 +22,8 @@ type nodeDrain struct {
 }
 
 func (cfg *osdUpgradeConfig) IsValid() error {
-	if cfg.Maintenance.ControlPlaneTime <= 0 {
-		return fmt.Errorf("Config maintenace controlPlaneTime out is invalid")
-	}
-	if cfg.Maintenance.WorkerNodeTime <= 0 {
-		return fmt.Errorf("Config maintenace workerNodeTime is invalid")
+	if err := cfg.Maintenance.IsValid(); err != nil {
+		return err
 	}
 	if cfg.Scale.TimeOut <= 0 {
 		return fmt.Errorf("Config scale timeOut is invalid")
@@ -39,14 +33,6 @@ func (cfg *osdUpgradeConfig) IsValid() error {
 	}
 
 	return nil
-}
-
-func (cfg *osdUpgradeConfig) GetControlPlaneDuration() time.Duration {
-	return time.Duration(cfg.Maintenance.ControlPlaneTime) * time.Minute
-}
-
-func (cfg *osdUpgradeConfig) GetWorkerNodeDuration() time.Duration {
-	return time.Duration(cfg.Maintenance.WorkerNodeTime) * time.Minute
 }
 
 func (cfg *osdUpgradeConfig) GetScaleDuration() time.Duration {

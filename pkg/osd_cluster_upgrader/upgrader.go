@@ -62,7 +62,7 @@ func NewClient(c client.Client, cfm configmanager.ConfigManager, mc metrics.Metr
 		return nil, err
 	}
 
-	m, err := maintenance.NewBuilder().NewClient(c)
+	m, err := maintenance.NewBuilder().NewClient(c, cfg.Maintenance)
 	if err != nil {
 		return nil, err
 	}
@@ -191,8 +191,7 @@ func CommenceUpgrade(c client.Client, cfg *osdUpgradeConfig, scaler scaler.Scale
 
 // CreateControlPlaneMaintWindow creates the maintenance window for control plane
 func CreateControlPlaneMaintWindow(c client.Client, cfg *osdUpgradeConfig, scaler scaler.Scaler, metricsClient metrics.Metrics, m maintenance.Maintenance, upgradeConfig *upgradev1alpha1.UpgradeConfig, logger logr.Logger) (bool, error) {
-	endTime := time.Now().Add(cfg.GetControlPlaneDuration())
-	err := m.StartControlPlane(endTime, upgradeConfig.Spec.Desired.Version)
+	err := m.StartControlPlane(upgradeConfig.Spec.Desired.Version)
 	if err != nil {
 		return false, err
 	}
@@ -225,11 +224,8 @@ func CreateWorkerMaintWindow(c client.Client, cfg *osdUpgradeConfig, scaler scal
 		return true, nil
 	}
 
-	maintenanceDurationPerNode := cfg.GetWorkerNodeDuration()
-	workerMaintenanceExpectedDuration := time.Duration(pendingWorkerCount) * maintenanceDurationPerNode
-	endTime := time.Now().Add(workerMaintenanceExpectedDuration)
 	logger.Info(fmt.Sprintf("Creating worker node maintenace for %d remaining nodes", pendingWorkerCount))
-	err = m.StartWorker(endTime, upgradeConfig.Spec.Desired.Version)
+	err = m.StartWorker(int(pendingWorkerCount), upgradeConfig.Spec.Desired.Version)
 	if err != nil {
 		return false, err
 	}
