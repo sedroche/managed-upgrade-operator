@@ -16,6 +16,7 @@ import (
 	"github.com/openshift/managed-upgrade-operator/pkg/maintenance"
 	mockMaintenance "github.com/openshift/managed-upgrade-operator/pkg/maintenance/mocks"
 	mockMetrics "github.com/openshift/managed-upgrade-operator/pkg/metrics/mocks"
+	"github.com/openshift/managed-upgrade-operator/pkg/scaler"
 	mockScaler "github.com/openshift/managed-upgrade-operator/pkg/scaler/mocks"
 	"github.com/openshift/managed-upgrade-operator/util/mocks"
 )
@@ -50,7 +51,7 @@ var _ = Describe("ClusterUpgrader maintenance window tests", func() {
 				WorkerNodeTime:   8,
 				ControlPlaneTime: 90,
 			},
-			Scale: scaleConfig{
+			Scale: scaler.ScaleConfig{
 				TimeOut: 30,
 			},
 		}

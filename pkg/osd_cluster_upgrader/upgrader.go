@@ -89,7 +89,7 @@ func NewClient(c client.Client, cfm configmanager.ConfigManager, mc metrics.Metr
 		client:      c,
 		maintenance: m,
 		metrics:     mc,
-		scaler:      scaler.NewScaler(),
+		scaler:      scaler.NewScaler(c, cfg.Scale),
 		cfg:         cfg,
 	}, nil
 }
@@ -139,7 +139,7 @@ func EnsureExtraUpgradeWorkers(c client.Client, cfg *osdUpgradeConfig, s scaler.
 		return true, nil
 	}
 
-	isScaled, err := s.EnsureScaleUpNodes(c, cfg.GetScaleDuration(), logger)
+	isScaled, err := s.EnsureScaleUpNodes(logger)
 	if err != nil {
 		if scaler.IsScaleTimeOutError(err) {
 			metricsClient.UpdateMetricScalingFailed(upgradeConfig.Name)
@@ -277,7 +277,7 @@ func AllWorkersUpgraded(c client.Client, cfg *osdUpgradeConfig, scaler scaler.Sc
 
 // RemoveExtraScaledNodes will scale down the extra workers added pre upgrade.
 func RemoveExtraScaledNodes(c client.Client, cfg *osdUpgradeConfig, scaler scaler.Scaler, metricsClient metrics.Metrics, m maintenance.Maintenance, upgradeConfig *upgradev1alpha1.UpgradeConfig, logger logr.Logger) (bool, error) {
-	isScaled, err := scaler.EnsureScaleDownNodes(c, logger)
+	isScaled, err := scaler.EnsureScaleDownNodes(logger)
 	if err != nil {
 		logger.Error(err, "failed to get upgrade extra machinesets")
 		return false, err

@@ -1,20 +1,18 @@
 package scaler
 
 import (
-	"time"
-
 	"github.com/go-logr/logr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 //go:generate mockgen -destination=mocks/scaler.go -package=mocks github.com/openshift/managed-upgrade-operator/pkg/scaler Scaler
 type Scaler interface {
-	EnsureScaleUpNodes(client.Client, time.Duration, logr.Logger) (bool, error)
-	EnsureScaleDownNodes(client.Client, logr.Logger) (bool, error)
+	EnsureScaleUpNodes(logr.Logger) (bool, error)
+	EnsureScaleDownNodes(logr.Logger) (bool, error)
 }
 
-func NewScaler() Scaler {
-	return &machineSetScaler{}
+func NewScaler(c client.Client, cfg ScaleConfig) Scaler {
+	return &machineSetScaler{c, cfg}
 }
 
 type scaleTimeOutError struct {

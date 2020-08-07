@@ -5,21 +5,18 @@ import (
 	"time"
 
 	"github.com/openshift/managed-upgrade-operator/pkg/maintenance"
+	"github.com/openshift/managed-upgrade-operator/pkg/scaler"
 )
 
 type osdUpgradeConfig struct {
 	Maintenance maintenance.MaintenanceConfig `yaml:"maintenance"`
-	Scale       scaleConfig                   `yaml:"scale"`
+	Scale       scaler.ScaleConfig            `yaml:"scale"`
 	NodeDrain   nodeDrain                     `yaml:"nodeDrain"`
 	HealthCheck healthCheck                   `yaml:"healthCheck"`
 }
 
 type healthCheck struct {
 	IgnoredCriticals []string `yaml:"ignoredCriticals"`
-}
-
-type scaleConfig struct {
-	TimeOut int `yaml:"timeOut"`
 }
 
 type nodeDrain struct {
@@ -30,18 +27,14 @@ func (cfg *osdUpgradeConfig) IsValid() error {
 	if err := cfg.Maintenance.IsValid(); err != nil {
 		return err
 	}
-	if cfg.Scale.TimeOut <= 0 {
-		return fmt.Errorf("Config scale timeOut is invalid")
+	if err := cfg.Scale.IsValid(); err != nil {
+		return err
 	}
 	if cfg.NodeDrain.TimeOut <= 0 {
 		return fmt.Errorf("Config nodeDrain timeOut is invalid")
 	}
 
 	return nil
-}
-
-func (cfg *osdUpgradeConfig) GetScaleDuration() time.Duration {
-	return time.Duration(cfg.Scale.TimeOut) * time.Minute
 }
 
 func (cfg *osdUpgradeConfig) GetNodeDrainDuration() time.Duration {

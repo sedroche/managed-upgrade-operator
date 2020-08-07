@@ -18,13 +18,16 @@ const (
 	LABEL_UPGRADE = "upgrade.managed.openshift.io"
 )
 
-type machineSetScaler struct{}
+type machineSetScaler struct {
+	client client.Client
+	cfg    ScaleConfig
+}
 
 // This will create a new MachineSet with 1 extra replicas for workers in every region and report when the nodes are ready.
-func (s *machineSetScaler) EnsureScaleUpNodes(c client.Client, timeOut time.Duration, logger logr.Logger) (bool, error) {
+func (s *machineSetScaler) EnsureScaleUpNodes(logger logr.Logger) (bool, error) {
 	upgradeMachinesets := &machineapi.MachineSetList{}
 
-	err := c.List(context.TODO(), upgradeMachinesets, []client.ListOption{
+	err := s.client.List(context.TODO(), upgradeMachinesets, []client.ListOption{
 		client.InNamespace("openshift-machine-api"),
 		client.MatchingLabels{LABEL_UPGRADE: "true"},
 	}...)
@@ -34,7 +37,7 @@ func (s *machineSetScaler) EnsureScaleUpNodes(c client.Client, timeOut time.Dura
 	}
 	originalMachineSets := &machineapi.MachineSetList{}
 
-	err = c.List(context.TODO(), originalMachineSets, []client.ListOption{
+	err = s.client.List(context.TODO(), originalMachineSets, []client.ListOption{
 		client.InNamespace("openshift-machine-api"),
 		client.MatchingLabels{"hive.openshift.io/machine-pool": "worker"},
 	}...)
@@ -76,7 +79,7 @@ func (s *machineSetScaler) EnsureScaleUpNodes(c client.Client, timeOut time.Dura
 		newMs.Spec.Selector.MatchLabels[LABEL_UPGRADE] = "true"
 		logger.Info(fmt.Sprintf("creating machineset %s for upgrade", newMs.Name))
 
-		err = c.Create(context.TODO(), newMs)
+		err = s.client.Create(context.TODO(), newMs)
 		if err != nil {
 			logger.Error(err, "failed to create machineset")
 			return false, err
@@ -88,7 +91,7 @@ func (s *machineSetScaler) EnsureScaleUpNodes(c client.Client, timeOut time.Dura
 		return false, nil
 	}
 	nodes := &corev1.NodeList{}
-	err = c.List(context.TODO(), nodes)
+	err = s.client.List(context.TODO(), nodes)
 	if err != nil {
 		logger.Error(err, "failed to list nodes")
 		return false, err
@@ -99,14 +102,14 @@ func (s *machineSetScaler) EnsureScaleUpNodes(c client.Client, timeOut time.Dura
 		startTime := ms.CreationTimestamp
 		if ms.Status.Replicas != ms.Status.ReadyReplicas {
 
-			if time.Now().After(startTime.Time.Add(timeOut)) {
+			if time.Now().After(startTime.Time.Add(s.cfg.GetScaleDuration())) {
 				return false, NewScaleTimeOutError(fmt.Sprintf("Machineset %s provisioning timout", ms.Name))
 			}
 			logger.Info(fmt.Sprintf("not all machines are ready for machineset:%s", ms.Name))
 			return false, nil
 		}
 		machines := &machineapi.MachineList{}
-		err := c.List(context.TODO(), machines, []client.ListOption{
+		err := s.client.List(context.TODO(), machines, []client.ListOption{
 			client.InNamespace("openshift-machine-api"),
 			client.MatchingLabels{LABEL_UPGRADE: "true"},
 		}...)
@@ -130,7 +133,7 @@ func (s *machineSetScaler) EnsureScaleUpNodes(c client.Client, timeOut time.Dura
 		}
 		if !nodeReady {
 			allNodeReady = false
-			if time.Now().After(startTime.Time.Add(timeOut)) {
+			if time.Now().After(startTime.Time.Add(s.cfg.GetScaleDuration())) {
 				logger.Info("node is not ready within timeout time")
 				return false, NewScaleTimeOutError(fmt.Sprintf("Timeout waiting for node:%s to become ready", nodeName))
 			}
@@ -145,10 +148,10 @@ func (s *machineSetScaler) EnsureScaleUpNodes(c client.Client, timeOut time.Dura
 }
 
 // This will remove extra MachineSets and report when the nodes are removed.
-func (s *machineSetScaler) EnsureScaleDownNodes(c client.Client, logger logr.Logger) (bool, error) {
+func (s *machineSetScaler) EnsureScaleDownNodes(logger logr.Logger) (bool, error) {
 	upgradeMachinesets := &machineapi.MachineSetList{}
 
-	err := c.List(context.TODO(), upgradeMachinesets, []client.ListOption{
+	err := s.client.List(context.TODO(), upgradeMachinesets, []client.ListOption{
 		client.InNamespace("openshift-machine-api"),
 		client.MatchingLabels{LABEL_UPGRADE: "true"},
 	}...)
@@ -159,7 +162,7 @@ func (s *machineSetScaler) EnsureScaleDownNodes(c client.Client, logger logr.Log
 
 	for _, ms := range upgradeMachinesets.Items {
 		if ms.ObjectMeta.DeletionTimestamp == nil {
-			err = c.Delete(context.TODO(), &ms)
+			err = s.client.Delete(context.TODO(), &ms)
 			if err != nil {
 				return false, err
 			}
@@ -168,7 +171,7 @@ func (s *machineSetScaler) EnsureScaleDownNodes(c client.Client, logger logr.Log
 
 	// MachineSets control workers and infras nodes.
 	originalMachineSets := &machineapi.MachineSetList{}
-	err = c.List(context.TODO(), originalMachineSets, []client.ListOption{
+	err = s.client.List(context.TODO(), originalMachineSets, []client.ListOption{
 		client.InNamespace("openshift-machine-api"),
 		NotMatchingLabels{LABEL_UPGRADE: "true"},
 	}...)
@@ -179,7 +182,7 @@ func (s *machineSetScaler) EnsureScaleDownNodes(c client.Client, logger logr.Log
 
 	// Desired replicas should match worker and infra count of nodes.
 	nonMasterNodes := &corev1.NodeList{}
-	err = c.List(context.TODO(), nonMasterNodes, []client.ListOption{
+	err = s.client.List(context.TODO(), nonMasterNodes, []client.ListOption{
 		NotMatchingLabels{"node-role.kubernetes.io/master": ""},
 	}...)
 	if err != nil {
