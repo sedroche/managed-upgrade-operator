@@ -2,12 +2,10 @@ package upgradeconfig
 
 import (
 	"context"
-	"time"
+	"fmt"
+	"k8s.io/apimachinery/pkg/types"
+	"os"
 
-	"github.com/go-logr/logr"
-	"github.com/hashicorp/go-multierror"
-	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -21,9 +19,12 @@ import (
 	cub "github.com/openshift/managed-upgrade-operator/pkg/cluster_upgrader_builder"
 	"github.com/openshift/managed-upgrade-operator/pkg/configmanager"
 	"github.com/openshift/managed-upgrade-operator/pkg/metrics"
-	"github.com/openshift/managed-upgrade-operator/pkg/osd_cluster_upgrader"
 	"github.com/openshift/managed-upgrade-operator/pkg/scheduler"
 	"github.com/openshift/managed-upgrade-operator/pkg/validation"
+
+	"github.com/openshift-online/ocm-sdk-go"
+	configv1 "github.com/openshift/api/config/v1"
+	cmv1 "github.com/openshift-online/ocm-sdk-go/clustersmgmt/v1"
 )
 
 var (
@@ -91,153 +92,74 @@ func (r *ReconcileUpgradeConfig) Reconcile(request reconcile.Request) (reconcile
 	reqLogger := log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
 	reqLogger.Info("Reconciling UpgradeConfig")
 
-	// Initialise metrics
-	metricsClient, err := r.metricsClientBuilder.NewClient(r.client)
+	// Get the token
+	token := os.Getenv("OCM_TOKEN")
+
+	cv := &configv1.ClusterVersion{}
+	err := r.client.Get(context.TODO(), types.NamespacedName{Name: "version"} , cv)
 	if err != nil {
-		return reconcile.Result{}, err
-	}
-
-	// Fetch the UpgradeConfig instance
-	instance := &upgradev1alpha1.UpgradeConfig{}
-	err = r.client.Get(context.TODO(), request.NamespacedName, instance)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			// Request object not found, could have been deleted after reconcile request.
-			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
-			// Return and don't requeue
-			return reconcile.Result{}, nil
-		}
-		// Error reading the object - requeue the request.
-		return reconcile.Result{}, err
-	}
-
-	var history upgradev1alpha1.UpgradeHistory
-	found := false
-	for _, h := range instance.Status.History {
-		if h.Version == instance.Spec.Desired.Version {
-			history = h
-			found = true
-		}
-	}
-	if !found {
-		history = upgradev1alpha1.UpgradeHistory{Version: instance.Spec.Desired.Version, Phase: upgradev1alpha1.UpgradePhaseNew}
-		history.Conditions = upgradev1alpha1.NewConditions()
-		instance.Status.History = append([]upgradev1alpha1.UpgradeHistory{history}, instance.Status.History...)
-		err := r.client.Status().Update(context.TODO(), instance)
-		if err != nil {
-			return reconcile.Result{}, err
-		}
-	}
-
-	status := history.Phase
-
-	reqLogger.Info("Current cluster status", "status", status)
-
-	switch status {
-	case upgradev1alpha1.UpgradePhaseNew, upgradev1alpha1.UpgradePhasePending:
-		reqLogger.Info("Validating UpgradeConfig")
-
-		// Get current ClusterVersion
-		cv, err := osd_cluster_upgrader.GetClusterVersion(r.client)
-		if err != nil {
-			return reconcile.Result{}, err
-		}
-
-		// Build a Validator
-		validator, err := r.validationBuilder.NewClient()
-		if err != nil {
-			return reconcile.Result{}, err
-		}
-
-		// Validate UpgradeConfig instance
-		validatorResult, err := validator.IsValidUpgradeConfig(instance, cv, reqLogger)
-		if err != nil {
-			reqLogger.Info("An error occurred while validating UpgradeConfig")
-			return reconcile.Result{}, err
-		}
-		if !validatorResult.IsValid {
-			reqLogger.Info(validatorResult.Message)
-			metricsClient.UpdateMetricValidationFailed(instance.Name)
-			return reconcile.Result{}, nil
-		}
-		reqLogger.Info("UpgradeConfig validated.")
-		metricsClient.UpdateMetricValidationSucceeded(instance.Name)
-
-		cfm := r.configManagerBuilder.New(r.client, request.Namespace)
-		cfg := &config{}
-		err = cfm.Into(cfg)
-		if err != nil {
-			return reconcile.Result{}, err
-		}
-
-		reqLogger.Info("Checking if cluster can commence upgrade.")
-		schedulerResult := r.scheduler.IsReadyToUpgrade(instance, cfg.GetUpgradeWindowTimeOutDuration())
-		if schedulerResult.IsReady {
-			upgrader, err := r.clusterUpgraderBuilder.NewClient(r.client, cfm, metricsClient, instance.Spec.Type)
-			if err != nil {
-				return reconcile.Result{}, err
-			}
-
-			now := time.Now()
-			history.Phase = upgradev1alpha1.UpgradePhaseUpgrading
-			history.StartTime = &metav1.Time{Time: now}
-			instance.Status.History.SetHistory(history)
-			err = r.client.Status().Update(context.TODO(), instance)
-			if err != nil {
-				return reconcile.Result{}, err
-			}
-
-			reqLogger.Info("Cluster is commencing upgrade.", "time", now)
-			metricsClient.UpdateMetricUpgradeWindowNotBreached(instance.Name)
-			return r.upgradeCluster(upgrader, instance, reqLogger)
-		} else {
-			if schedulerResult.IsBreached {
-				// We are past the maximum allowed time to commence upgrading
-				log.Error(nil, "field spec.upgradeAt cannot have backdated time")
-				metricsClient.UpdateMetricUpgradeWindowBreached(instance.Name)
-			}
-
-			history.Phase = upgradev1alpha1.UpgradePhasePending
-			instance.Status.History.SetHistory(history)
-			err = r.client.Status().Update(context.TODO(), instance)
-			if err != nil {
-				return reconcile.Result{}, err
-			}
-			return reconcile.Result{}, nil
-		}
-	case upgradev1alpha1.UpgradePhaseUpgrading:
-		reqLogger.Info("Cluster detected as already upgrading.")
-		cfm := r.configManagerBuilder.New(r.client, request.Namespace)
-		upgrader, err := r.clusterUpgraderBuilder.NewClient(r.client, cfm, metricsClient, instance.Spec.Type)
-		if err != nil {
-			return reconcile.Result{}, err
-		}
-		return r.upgradeCluster(upgrader, instance, reqLogger)
-	case upgradev1alpha1.UpgradePhaseUpgraded:
-		reqLogger.Info("Cluster is already upgraded")
 		return reconcile.Result{}, nil
-	default:
-		reqLogger.Info("Unknown status")
 	}
 
+	// Create the connection, and remember to close it:
+	connection, err := sdk.NewConnectionBuilder().
+		URL("https://api.stage.openshift.com").
+		Tokens(token).
+		Build()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Can't build connection: %v\n", err)
+		os.Exit(1)
+	}
+	defer connection.Close()
+
+	cluster, err := GetCluster(connection.ClustersMgmt().V1().Clusters(), string(cv.Spec.ClusterID))
+	uc, err := getUpgradeConfig(cluster)
+
+	err = r.client.Update(context.TODO(), uc)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+
+	fmt.Printf("%v", cluster)
 	return reconcile.Result{}, nil
 }
 
-func (r *ReconcileUpgradeConfig) upgradeCluster(upgrader cub.ClusterUpgrader, uc *upgradev1alpha1.UpgradeConfig, logger logr.Logger) (reconcile.Result, error) {
-	me := &multierror.Error{}
+func getUpgradeConfig(*cmv1.Cluster) (*upgradev1alpha1.UpgradeConfig, error) {
+	return &upgradev1alpha1.UpgradeConfig{
+		Spec: upgradev1alpha1.UpgradeConfigSpec{
+			Type: upgradev1alpha1.OSD,
+			UpgradeAt: "2020-01-01T00:00:00Z",
+			PDBForceDrainTimeout: 60,
+			Desired: upgradev1alpha1.Update{
+				Channel: "fast-4.4",
+				Version: "4.3.19",
+			},
+		},
+	}, nil
+}
 
-	phase, condition, err := upgrader.UpgradeCluster(uc, logger)
-	me = multierror.Append(err, me)
-
-	history := uc.Status.History.GetHistory(uc.Spec.Desired.Version)
-	history.Conditions = upgradev1alpha1.Conditions{*condition}
-	history.Phase = phase
-	if phase == upgradev1alpha1.UpgradePhaseUpgraded {
-		history.CompleteTime = &metav1.Time{Time: time.Now()}
+// TODO: SDK does not work on external ids
+// connection.ClustersMgmt().V1().Clusters().Cluster(id)
+func GetCluster(client *cmv1.ClustersClient, clusterKey string) (*cmv1.Cluster, error) {
+	query := fmt.Sprintf(
+		"(id = '%s' or name = '%s' or external_id = '%s')",
+		clusterKey, clusterKey,
+	)
+	response, err := client.List().
+		Search(query).
+		Page(1).
+		Size(1).
+		Send()
+	if err != nil {
+		return nil, fmt.Errorf("Failed to locate cluster '%s': %v", clusterKey, err)
 	}
-	uc.Status.History.SetHistory(*history)
-	err = r.client.Status().Update(context.TODO(), uc)
-	me = multierror.Append(err, me)
 
-	return reconcile.Result{RequeueAfter: 1 * time.Minute}, me.ErrorOrNil()
+	switch response.Total() {
+	case 0:
+		return nil, fmt.Errorf("There is no cluster with identifier or name '%s'", clusterKey)
+	case 1:
+		return response.Items().Slice()[0], nil
+	default:
+		return nil, fmt.Errorf("There are %d clusters with identifier or name '%s'", response.Total(), clusterKey)
+	}
 }
