@@ -1,4 +1,4 @@
-package upgradeconfig
+package drain
 
 import (
 	"testing"
@@ -7,7 +7,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func TestUpgradeConfig(t *testing.T) {
+func TestMaintenance(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "UpgradeConfig Suite")
+	RunSpecs(t, "Drain Suite")
 }

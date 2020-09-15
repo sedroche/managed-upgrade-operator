@@ -21,16 +21,16 @@ func NewUpgradeConfigBuilder() *testUpgradeConfigBuilder {
 		uc: api.UpgradeConfig{
 
 			ObjectMeta: metav1.ObjectMeta{
-				Name:                       "fakeUpgradeConfig",
-				Namespace:                  "fakeNamespace",
+				Name:      "fakeUpgradeConfig",
+				Namespace: "fakeNamespace",
 			},
 			Spec: api.UpgradeConfigSpec{
 				Type: api.OSD,
-				Desired:             api.Update{
+				Desired: api.Update{
 					Version: "fakeVersion",
 					Channel: "fakeChannel",
 				},
-				UpgradeAt: time.Now().Format(time.RFC3339),
+				UpgradeAt:            time.Now().Format(time.RFC3339),
 				PDBForceDrainTimeout: 60,
 			},
 		},
@@ -46,8 +46,8 @@ func (t *testUpgradeConfigBuilder) WithNamespacedName(namespacedName types.Names
 func (t *testUpgradeConfigBuilder) WithPhase(phase api.UpgradePhase) *testUpgradeConfigBuilder {
 	t.uc.Status.History = []api.UpgradeHistory{
 		api.UpgradeHistory{
-			Version:      t.uc.Spec.Desired.Version,
-			Phase:        phase,
+			Version: t.uc.Spec.Desired.Version,
+			Phase:   phase,
 		},
 	}
 	return t
@@ -55,7 +55,7 @@ func (t *testUpgradeConfigBuilder) WithPhase(phase api.UpgradePhase) *testUpgrad
 
 type UpgradeConfigMatcher struct {
 	ActualUpgradeConfig api.UpgradeConfig
-	FailReason             string
+	FailReason          string
 }
 
 func NewUpgradeConfigMatcher() *UpgradeConfigMatcher {

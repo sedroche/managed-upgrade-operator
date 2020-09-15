@@ -56,26 +56,26 @@ var _ = Describe("Validation of UpgradeConfig CR", func() {
 				},
 				History: []configv1.UpdateHistory{
 					{
-						State:          testCompletedUpdate,
-						StartedTime:    v1.Time{
+						State: testCompletedUpdate,
+						StartedTime: v1.Time{
 							Time: time.Now().UTC().Add(-60 * time.Minute),
 						},
 						CompletionTime: &v1.Time{
 							Time: time.Now().UTC().Add(-60 * time.Minute),
 						},
-						Version:        "some bad version",
-						Verified:       false,
+						Version:  "some bad version",
+						Verified: false,
 					},
 					{
-						State:          testCompletedUpdate,
-						StartedTime:    v1.Time{
+						State: testCompletedUpdate,
+						StartedTime: v1.Time{
 							Time: time.Now().UTC(),
 						},
 						CompletionTime: &v1.Time{
 							Time: time.Now().UTC(),
 						},
-						Version:        testUpgradeConfig.Spec.Desired.Version,
-						Verified:       false,
+						Version:  testUpgradeConfig.Spec.Desired.Version,
+						Verified: false,
 					},
 				},
 			},

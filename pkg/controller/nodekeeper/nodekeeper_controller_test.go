@@ -5,8 +5,6 @@ import (
 	"time"
 
 	"github.com/golang/mock/gomock"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -18,6 +16,7 @@ import (
 	mockMetrics "github.com/openshift/managed-upgrade-operator/pkg/metrics/mocks"
 	"github.com/openshift/managed-upgrade-operator/util/mocks"
 	testStructs "github.com/openshift/managed-upgrade-operator/util/mocks/structs"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -112,26 +111,17 @@ var _ = Describe("NodeKeeperController", func() {
 				}
 				config = nodeKeeperConfig{
 					NodeDrain: machinery.NodeDrain{
-						Timeout: 5,
+						Timeout:        5,
+						WorkerNodeTime: 8,
 					},
 				}
 			})
 			It("should alert when a node drain takes too long", func() {
-				testNode := corev1.Node{
-					Spec: corev1.NodeSpec{
-						Unschedulable: true,
-						Taints: []corev1.Taint{
-							{Effect: corev1.TaintEffectNoSchedule,
-								TimeAdded: &metav1.Time{Time: time.Now().Add(-10 * time.Minute)},
-							},
-						},
-					},
-				}
-
 				gomock.InOrder(
 					mockKubeClient.EXPECT().List(gomock.Any(), gomock.Any(), gomock.Any()).SetArg(1, upgradeConfigList).Return(nil),
 					mockMachineryClient.EXPECT().IsUpgrading(gomock.Any(), "worker").Return(&machinery.UpgradingResult{IsUpgrading: true}, nil),
-					mockKubeClient.EXPECT().Get(gomock.Any(), testNodeName, gomock.Any()).SetArg(2, testNode).Return(nil),
+					mockKubeClient.EXPECT().Get(gomock.Any(), testNodeName, gomock.Any()).Times(1),
+					mockMachineryClient.EXPECT().IsNodeDraining(gomock.Any()).Return(&machinery.IsDrainResult{IsDraining: true, StartTime: &metav1.Time{Time: time.Now().Add(-10 * time.Minute)}}),
 					mockMetricsBuilder.EXPECT().NewClient(gomock.Any()).Return(mockMetricsClient, nil),
 					mockConfigManagerBuilder.EXPECT().New(gomock.Any(), gomock.Any()).Return(mockConfigManager),
 					mockConfigManager.EXPECT().Into(gomock.Any()).SetArg(0, config),
@@ -144,15 +134,11 @@ var _ = Describe("NodeKeeperController", func() {
 				Expect(result.RequeueAfter).To(Not(BeNil()))
 			})
 			It("should reset any alerts once node is not draining", func() {
-				testNode := corev1.Node{
-					Spec: corev1.NodeSpec{
-						Unschedulable: false,
-					},
-				}
 				gomock.InOrder(
 					mockKubeClient.EXPECT().List(gomock.Any(), gomock.Any(), gomock.Any()).SetArg(1, upgradeConfigList).Return(nil),
 					mockMachineryClient.EXPECT().IsUpgrading(gomock.Any(), "worker").Return(&machinery.UpgradingResult{IsUpgrading: true}, nil),
-					mockKubeClient.EXPECT().Get(gomock.Any(), testNodeName, gomock.Any()).SetArg(2, testNode).Return(nil),
+					mockKubeClient.EXPECT().Get(gomock.Any(), testNodeName, gomock.Any()).Times(1),
+					mockMachineryClient.EXPECT().IsNodeDraining(gomock.Any()).Return(&machinery.IsDrainResult{IsDraining: false}),
 					mockMetricsBuilder.EXPECT().NewClient(gomock.Any()).Return(mockMetricsClient, nil),
 					mockMetricsClient.EXPECT().ResetMetricNodeDrainFailed(gomock.Any()).Times(1),
 					mockMetricsClient.EXPECT().UpdateMetricNodeDrainFailed(gomock.Any()).Times(0),

@@ -21,7 +21,7 @@ const (
 	metricsTag   = "upgradeoperator"
 	nameLabel    = "upgradeconfig_name"
 	versionLabel = "version"
-	nodeLabel = "node_name"
+	nodeLabel    = "node_name"
 )
 
 //go:generate mockgen -destination=mocks/metrics.go -package=mocks github.com/openshift/managed-upgrade-operator/pkg/metrics Metrics

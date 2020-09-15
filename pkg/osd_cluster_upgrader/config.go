@@ -16,7 +16,6 @@ type osdUpgradeConfig struct {
 
 type maintenanceConfig struct {
 	ControlPlaneTime int           `yaml:"controlPlaneTime"`
-	WorkerNodeTime   int           `yaml:"workerNodeTime"`
 	IgnoredAlerts    ignoredAlerts `yaml:"ignoredAlerts"`
 }
 
@@ -31,19 +30,12 @@ func (cfg *maintenanceConfig) IsValid() error {
 	if cfg.ControlPlaneTime <= 0 {
 		return fmt.Errorf("Config maintenace controlPlaneTime out is invalid")
 	}
-	if cfg.WorkerNodeTime <= 0 {
-		return fmt.Errorf("Config maintenace workerNodeTime is invalid")
-	}
 
 	return nil
 }
 
 func (cfg *maintenanceConfig) GetControlPlaneDuration() time.Duration {
 	return time.Duration(cfg.ControlPlaneTime) * time.Minute
-}
-
-func (cfg *maintenanceConfig) GetWorkerNodeDuration() time.Duration {
-	return time.Duration(cfg.WorkerNodeTime) * time.Minute
 }
 
 type scaleConfig struct {
@@ -63,6 +55,9 @@ func (cfg *osdUpgradeConfig) IsValid() error {
 	}
 	if cfg.NodeDrain.Timeout <= 0 {
 		return fmt.Errorf("Config nodeDrain timeOut is invalid")
+	}
+	if cfg.NodeDrain.WorkerNodeTime <= 0 {
+		return fmt.Errorf("Config maintenace workerNodeTime is invalid")
 	}
 
 	return nil

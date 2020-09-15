@@ -96,11 +96,13 @@ var _ = Describe("ClusterUpgrader", func() {
 		stepCounter = make(map[upgradev1alpha1.UpgradeConditionType]int)
 		config = &osdUpgradeConfig{
 			Maintenance: maintenanceConfig{
-				WorkerNodeTime:   8,
 				ControlPlaneTime: 90,
 			},
 			Scale: scaleConfig{
 				TimeOut: 30,
+			},
+			NodeDrain: machinery.NodeDrain{
+				WorkerNodeTime: 8,
 			},
 		}
 	})

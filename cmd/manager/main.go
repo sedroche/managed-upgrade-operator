@@ -135,7 +135,6 @@ func main() {
 		os.Exit(1)
 	}
 
-
 	if err = routev1.Install(mgr.GetScheme()); err != nil {
 		log.Error(err, "")
 		os.Exit(1)
