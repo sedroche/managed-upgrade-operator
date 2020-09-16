@@ -158,7 +158,7 @@ func EnsureExtraUpgradeWorkers(c client.Client, cfg *osdUpgradeConfig, s scaler.
 
 // CommenceUpgrade will update the clusterversion object to apply the desired version to trigger real OCP upgrade
 func CommenceUpgrade(c client.Client, cfg *osdUpgradeConfig, scaler scaler.Scaler, metricsClient metrics.Metrics, m maintenance.Maintenance, cvClient cv.ClusterVersion, upgradeConfig *upgradev1alpha1.UpgradeConfig, machinery machinery.Machinery, logger logr.Logger) (bool, error) {
-	upgradeCommenced, err := hasUpgradeCommenced(cvClient, upgradeConfig)
+	upgradeCommenced, err := cvClient.HasUpgradeCommenced(upgradeConfig)
 	if err != nil {
 		return false, err
 	}

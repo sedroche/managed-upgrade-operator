@@ -2,16 +2,20 @@ package clusterversion
 
 import (
 	"context"
+	"fmt"
 
 	configv1 "github.com/openshift/api/config/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	upgradev1alpha1 "github.com/openshift/managed-upgrade-operator/pkg/apis/upgrade/v1alpha1"
 )
 
 //go:generate mockgen -destination=mocks/mockClusterVersion.go -package=mocks github.com/openshift/managed-upgrade-operator/pkg/clusterversion ClusterVersion
 type ClusterVersion interface {
 	GetClusterVersion() (*configv1.ClusterVersion, error)
+	HasUpgradeCommenced(*upgradev1alpha1.UpgradeConfig) (bool, error)
 }
 
 //go:generate mockgen -destination=mocks/mockClusterVersionBuilder.go -package=mocks github.com/openshift/managed-upgrade-operator/pkg/clusterversion ClusterVersionBuilder
@@ -51,4 +55,8 @@ func (c *clusterVersionClient) GetClusterVersion() (*configv1.ClusterVersion, er
 	}
 
 	return nil, errors.NewNotFound(schema.GroupResource{Group: configv1.GroupName, Resource: "ClusterVersion"}, "ClusterVersion")
+}
+
+func (c *clusterVersionClient) HasUpgradeCommenced(*upgradev1alpha1.UpgradeConfig) (bool, error) {
+	return false, fmt.Errorf("")
 }
