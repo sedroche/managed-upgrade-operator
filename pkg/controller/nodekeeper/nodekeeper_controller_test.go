@@ -11,6 +11,8 @@ import (
 
 	upgradev1alpha1 "github.com/openshift/managed-upgrade-operator/pkg/apis/upgrade/v1alpha1"
 	configMocks "github.com/openshift/managed-upgrade-operator/pkg/configmanager/mocks"
+	"github.com/openshift/managed-upgrade-operator/pkg/drain"
+	mockDrain "github.com/openshift/managed-upgrade-operator/pkg/drain/mocks"
 	"github.com/openshift/managed-upgrade-operator/pkg/machinery"
 	mockMachinery "github.com/openshift/managed-upgrade-operator/pkg/machinery/mocks"
 	mockMetrics "github.com/openshift/managed-upgrade-operator/pkg/metrics/mocks"
@@ -32,6 +34,8 @@ var _ = Describe("NodeKeeperController", func() {
 		mockMachineryClient      *mockMachinery.MockMachinery
 		mockMetricsBuilder       *mockMetrics.MockMetricsBuilder
 		mockMetricsClient        *mockMetrics.MockMetrics
+		mockDrainStrategyBuilder *mockDrain.MockDrainStrategyBuilder
+		mockDrainStrategy        *mockDrain.MockDrainStrategy
 		testNodeName             types.NamespacedName
 		upgradeConfigName        types.NamespacedName
 		upgradeConfigList        upgradev1alpha1.UpgradeConfigList
@@ -46,6 +50,8 @@ var _ = Describe("NodeKeeperController", func() {
 		mockMachineryClient = mockMachinery.NewMockMachinery(mockCtrl)
 		mockMetricsBuilder = mockMetrics.NewMockMetricsBuilder(mockCtrl)
 		mockMetricsClient = mockMetrics.NewMockMetrics(mockCtrl)
+		mockDrainStrategyBuilder = mockDrain.NewMockDrainStrategyBuilder(mockCtrl)
+		mockDrainStrategy = mockDrain.NewMockDrainStrategy(mockCtrl)
 		testNodeName = types.NamespacedName{
 			Name: "test-node-1",
 		}
@@ -61,6 +67,7 @@ var _ = Describe("NodeKeeperController", func() {
 			mockConfigManagerBuilder,
 			mockMachineryClient,
 			mockMetricsBuilder,
+			mockDrainStrategyBuilder,
 			runtime.NewScheme(),
 		}
 	})
@@ -110,7 +117,7 @@ var _ = Describe("NodeKeeperController", func() {
 					Items: []upgradev1alpha1.UpgradeConfig{uc},
 				}
 				config = nodeKeeperConfig{
-					NodeDrain: machinery.NodeDrain{
+					NodeDrain: drain.NodeDrain{
 						Timeout:        5,
 						WorkerNodeTime: 8,
 					},
@@ -125,6 +132,9 @@ var _ = Describe("NodeKeeperController", func() {
 					mockMetricsBuilder.EXPECT().NewClient(gomock.Any()).Return(mockMetricsClient, nil),
 					mockConfigManagerBuilder.EXPECT().New(gomock.Any(), gomock.Any()).Return(mockConfigManager),
 					mockConfigManager.EXPECT().Into(gomock.Any()).SetArg(0, config),
+					mockDrainStrategyBuilder.EXPECT().NewDrainStrategy(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(mockDrainStrategy, nil),
+					mockDrainStrategy.EXPECT().Execute(gomock.Any()).Return([]*drain.DrainStrategyResult{}, nil),
+					mockDrainStrategy.EXPECT().HasFailed(gomock.Any()).Return(true, nil),
 					mockMetricsClient.EXPECT().UpdateMetricNodeDrainFailed(gomock.Any()).Times(1),
 					mockMetricsClient.EXPECT().ResetMetricNodeDrainFailed(gomock.Any()).Times(0),
 				)

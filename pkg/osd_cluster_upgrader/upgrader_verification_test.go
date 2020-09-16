@@ -14,7 +14,7 @@ import (
 
 	upgradev1alpha1 "github.com/openshift/managed-upgrade-operator/pkg/apis/upgrade/v1alpha1"
 	cvMocks "github.com/openshift/managed-upgrade-operator/pkg/clusterversion/mocks"
-	"github.com/openshift/managed-upgrade-operator/pkg/machinery"
+	"github.com/openshift/managed-upgrade-operator/pkg/drain"
 	mockMachinery "github.com/openshift/managed-upgrade-operator/pkg/machinery/mocks"
 	mockMaintenance "github.com/openshift/managed-upgrade-operator/pkg/maintenance/mocks"
 	"github.com/openshift/managed-upgrade-operator/pkg/metrics"
@@ -68,7 +68,7 @@ var _ = Describe("ClusterUpgrader verification and health tests", func() {
 			HealthCheck: healthCheck{
 				IgnoredCriticals: []string{"alert1", "alert2"},
 			},
-			NodeDrain: machinery.NodeDrain{
+			NodeDrain: drain.NodeDrain{
 				WorkerNodeTime: 8,
 			},
 		}

@@ -4,14 +4,14 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/openshift/managed-upgrade-operator/pkg/machinery"
+	"github.com/openshift/managed-upgrade-operator/pkg/drain"
 )
 
 type osdUpgradeConfig struct {
-	Maintenance maintenanceConfig   `yaml:"maintenance"`
-	Scale       scaleConfig         `yaml:"scale"`
-	NodeDrain   machinery.NodeDrain `yaml:"nodeDrain"`
-	HealthCheck healthCheck         `yaml:"healthCheck"`
+	Maintenance maintenanceConfig `yaml:"maintenance"`
+	Scale       scaleConfig       `yaml:"scale"`
+	NodeDrain   drain.NodeDrain   `yaml:"nodeDrain"`
+	HealthCheck healthCheck       `yaml:"healthCheck"`
 }
 
 type maintenanceConfig struct {

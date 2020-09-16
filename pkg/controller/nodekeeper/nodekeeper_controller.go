@@ -136,7 +136,7 @@ func (r *ReconcileNodeKeeper) Reconcile(request reconcile.Request) (reconcile.Re
 		return reconcile.Result{}, err
 	}
 
-	drainStrategy, err := r.drainstrategyBuilder.NewDrainStrategy(r.client, uc, node, cfg.NodeDrain)
+	drainStrategy, err := r.drainstrategyBuilder.NewDrainStrategy(r.client, uc, node, &cfg.NodeDrain)
 	if err != nil {
 		return reconcile.Result{}, err
 	}

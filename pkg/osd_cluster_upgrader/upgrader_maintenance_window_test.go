@@ -12,6 +12,7 @@ import (
 
 	upgradev1alpha1 "github.com/openshift/managed-upgrade-operator/pkg/apis/upgrade/v1alpha1"
 	cvMocks "github.com/openshift/managed-upgrade-operator/pkg/clusterversion/mocks"
+	"github.com/openshift/managed-upgrade-operator/pkg/drain"
 	"github.com/openshift/managed-upgrade-operator/pkg/machinery"
 	mockMachinery "github.com/openshift/managed-upgrade-operator/pkg/machinery/mocks"
 	mockMaintenance "github.com/openshift/managed-upgrade-operator/pkg/maintenance/mocks"
@@ -60,7 +61,7 @@ var _ = Describe("ClusterUpgrader maintenance window tests", func() {
 			Scale: scaleConfig{
 				TimeOut: 30,
 			},
-			NodeDrain: machinery.NodeDrain{
+			NodeDrain: drain.NodeDrain{
 				WorkerNodeTime: 8,
 			},
 		}

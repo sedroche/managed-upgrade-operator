@@ -19,6 +19,7 @@ import (
 	upgradev1alpha1 "github.com/openshift/managed-upgrade-operator/pkg/apis/upgrade/v1alpha1"
 	cv "github.com/openshift/managed-upgrade-operator/pkg/clusterversion"
 	cvMocks "github.com/openshift/managed-upgrade-operator/pkg/clusterversion/mocks"
+	"github.com/openshift/managed-upgrade-operator/pkg/drain"
 	"github.com/openshift/managed-upgrade-operator/pkg/machinery"
 	mockMachinery "github.com/openshift/managed-upgrade-operator/pkg/machinery/mocks"
 	"github.com/openshift/managed-upgrade-operator/pkg/maintenance"
@@ -101,7 +102,7 @@ var _ = Describe("ClusterUpgrader", func() {
 			Scale: scaleConfig{
 				TimeOut: 30,
 			},
-			NodeDrain: machinery.NodeDrain{
+			NodeDrain: drain.NodeDrain{
 				WorkerNodeTime: 8,
 			},
 		}

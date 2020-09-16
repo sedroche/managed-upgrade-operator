@@ -30,15 +30,18 @@ func Filter(podList *corev1.PodList, predicates ...podPredicate) *corev1.PodList
 	return filteredPods
 }
 
-func Delete(c client.Client, pl *corev1.PodList) (*DrainStrategyResult, error) {
+type DeleteResult struct {
+	Message string
+}
+
+func Delete(c client.Client, pl *corev1.PodList) (*DeleteResult, error) {
 	me := &multierror.Error{}
 	var podsMarkedForDeletion []string
-	// TODO: check what happens when it errors in here during multiple remove finalizers and delete
 	for _, p := range pl.Items {
 		if len(p.ObjectMeta.GetFinalizers()) != 0 {
 			err := removeFinalizers(c, &p)
 			if err != nil {
-				return &DrainStrategyResult{Message: fmt.Sprintf("Error removing finalizer for pod %s", p.Name)}, err
+				return &DeleteResult{Message: fmt.Sprintf("Error removing finalizer for pod %s", p.Name)}, err
 			}
 		}
 
@@ -52,7 +55,7 @@ func Delete(c client.Client, pl *corev1.PodList) (*DrainStrategyResult, error) {
 		}
 	}
 
-	return &DrainStrategyResult{Message: fmt.Sprintf("Pod(s) %s have been marked for deletion", strings.Join(podsMarkedForDeletion, ","))}, nil
+	return &DeleteResult{Message: fmt.Sprintf("Pod(s) %s have been marked for deletion", strings.Join(podsMarkedForDeletion, ","))}, nil
 }
 
 func removeFinalizers(c client.Client, p *corev1.Pod) error {
