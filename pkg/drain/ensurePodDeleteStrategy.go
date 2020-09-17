@@ -9,12 +9,12 @@ import (
 	"github.com/openshift/managed-upgrade-operator/pkg/pod"
 )
 
-type forceDeletePodStrategy struct {
+type ensurePodDeletionStrategy struct {
 	client  client.Client
 	filters []pod.PodPredicate
 }
 
-func (fdps *forceDeletePodStrategy) Execute() (*DrainStrategyResult, error) {
+func (fdps *ensurePodDeletionStrategy) Execute() (*DrainStrategyResult, error) {
 	allPods := &corev1.PodList{}
 	err := fdps.client.List(context.TODO(), allPods)
 	if err != nil {
@@ -40,13 +40,13 @@ func (fdps *forceDeletePodStrategy) Execute() (*DrainStrategyResult, error) {
 		result.Message = finRes.Message
 	}
 	if delRes.NumMarkedForDeletion > 0 {
-		result.Message += `\n` + delRes.Message
+		result.Message += " " + delRes.Message
 	}
 
 	return result, nil
 }
 
-func (fdps *forceDeletePodStrategy) HasFailed() (bool, error) {
+func (fdps *ensurePodDeletionStrategy) HasFailed() (bool, error) {
 	allPods := &corev1.PodList{}
 	err := fdps.client.List(context.TODO(), allPods)
 	if err != nil {
