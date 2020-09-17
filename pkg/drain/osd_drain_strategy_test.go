@@ -398,5 +398,27 @@ var _ = Describe("OSD Drain Strategy", func() {
 				Expect(filteredPods.Items[1].Name).To(Not(Equal(daemonsetPodName)))
 			})
 		})
+		Context("Pod Finalizers", func() {
+			It("should return pods that have a finalizer", func() {
+				podList = &corev1.PodList{
+					Items: []corev1.Pod{
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Finalizers: []string{"a.finalizer.com"},
+							},
+						},
+					},
+				}
+				filteredPods := pod.FilterPods(podList, hasFinalizers)
+				Expect(len(filteredPods.Items)).To(Equal(1))
+			})
+			It("should not return pods that have no finalizers", func() {
+				podList = &corev1.PodList{
+					Items: []corev1.Pod{{}},
+				}
+				filteredPods := pod.FilterPods(podList, hasFinalizers)
+				Expect(len(filteredPods.Items)).To(Equal(0))
+			})
+		})
 	})
 })
