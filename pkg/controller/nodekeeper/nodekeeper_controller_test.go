@@ -34,8 +34,8 @@ var _ = Describe("NodeKeeperController", func() {
 		mockMachineryClient      *mockMachinery.MockMachinery
 		mockMetricsBuilder       *mockMetrics.MockMetricsBuilder
 		mockMetricsClient        *mockMetrics.MockMetrics
-		mockDrainStrategyBuilder *mockDrain.MockDrainStrategyBuilder
-		mockDrainStrategy        *mockDrain.MockDrainStrategy
+		mockDrainStrategyBuilder *mockDrain.MockNodeDrainStrategyBuilder
+		mockDrainStrategy        *mockDrain.MockNodeDrainStrategy
 		testNodeName             types.NamespacedName
 		upgradeConfigName        types.NamespacedName
 		upgradeConfigList        upgradev1alpha1.UpgradeConfigList
@@ -50,8 +50,8 @@ var _ = Describe("NodeKeeperController", func() {
 		mockMachineryClient = mockMachinery.NewMockMachinery(mockCtrl)
 		mockMetricsBuilder = mockMetrics.NewMockMetricsBuilder(mockCtrl)
 		mockMetricsClient = mockMetrics.NewMockMetrics(mockCtrl)
-		mockDrainStrategyBuilder = mockDrain.NewMockDrainStrategyBuilder(mockCtrl)
-		mockDrainStrategy = mockDrain.NewMockDrainStrategy(mockCtrl)
+		mockDrainStrategyBuilder = mockDrain.NewMockNodeDrainStrategyBuilder(mockCtrl)
+		mockDrainStrategy = mockDrain.NewMockNodeDrainStrategy(mockCtrl)
 		testNodeName = types.NamespacedName{
 			Name: "test-node-1",
 		}
@@ -132,7 +132,7 @@ var _ = Describe("NodeKeeperController", func() {
 					mockMetricsBuilder.EXPECT().NewClient(gomock.Any()).Return(mockMetricsClient, nil),
 					mockConfigManagerBuilder.EXPECT().New(gomock.Any(), gomock.Any()).Return(mockConfigManager),
 					mockConfigManager.EXPECT().Into(gomock.Any()).SetArg(0, config),
-					mockDrainStrategyBuilder.EXPECT().NewDrainStrategy(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(mockDrainStrategy, nil),
+					mockDrainStrategyBuilder.EXPECT().NewNodeDrainStrategy(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(mockDrainStrategy, nil),
 					mockDrainStrategy.EXPECT().Execute(gomock.Any()).Return([]*drain.DrainStrategyResult{}, nil),
 					mockDrainStrategy.EXPECT().HasFailed(gomock.Any()).Return(true, nil),
 					mockMetricsClient.EXPECT().UpdateMetricNodeDrainFailed(gomock.Any()).Times(1),

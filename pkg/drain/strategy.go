@@ -10,33 +10,38 @@ import (
 	upgradev1alpha1 "github.com/openshift/managed-upgrade-operator/pkg/apis/upgrade/v1alpha1"
 )
 
-//go:generate mockgen -destination=mocks/drainStrategyBuilder.go -package=mocks github.com/openshift/managed-upgrade-operator/pkg/drain DrainStrategyBuilder
-type DrainStrategyBuilder interface {
-	NewDrainStrategy(c client.Client, uc *upgradev1alpha1.UpgradeConfig, node *corev1.Node, cfg *NodeDrain) (DrainStrategy, error)
+//go:generate mockgen -destination=mocks/nodeDrainStrategyBuilder.go -package=mocks github.com/openshift/managed-upgrade-operator/pkg/drain NodeDrainStrategyBuilder
+type NodeDrainStrategyBuilder interface {
+	NewNodeDrainStrategy(c client.Client, uc *upgradev1alpha1.UpgradeConfig, node *corev1.Node, cfg *NodeDrain) (NodeDrainStrategy, error)
 }
 
-//go:generate mockgen -destination=mocks/drainStrategy.go -package=mocks github.com/openshift/managed-upgrade-operator/pkg/drain DrainStrategy
-type DrainStrategy interface {
+//go:generate mockgen -destination=mocks/nodeDrainStrategy.go -package=mocks github.com/openshift/managed-upgrade-operator/pkg/drain NodeDrainStrategy
+type NodeDrainStrategy interface {
 	Execute(*metav1.Time) ([]*DrainStrategyResult, error)
 	HasFailed(*metav1.Time) (bool, error)
 }
 
-//go:generate mockgen -destination=./timeBasedDrainStrategy.go -package=drain github.com/openshift/managed-upgrade-operator/pkg/drain TimeBasedDrainStrategy
-type TimeBasedDrainStrategy interface {
-	GetWaitDuration() time.Duration
+//go:generate mockgen -destination=./drainStrategy.go -package=drain github.com/openshift/managed-upgrade-operator/pkg/drain DrainStrategy
+type DrainStrategy interface {
 	Execute() (*DrainStrategyResult, error)
-	GetName() string
-	GetDescription() string
-	HasFailed(*metav1.Time) (bool, error)
+	HasFailed() (bool, error)
 }
 
-func NewBuilder() DrainStrategyBuilder {
+//go:generate mockgen -destination=./timedDrainStrategy.go -package=drain github.com/openshift/managed-upgrade-operator/pkg/drain TimedDrainStrategy
+type TimedDrainStrategy interface {
+	GetWaitDuration() time.Duration
+	GetName() string
+	GetDescription() string
+	GetStrategy() DrainStrategy
+}
+
+func NewBuilder() NodeDrainStrategyBuilder {
 	return &drainStrategyBuilder{}
 }
 
 type drainStrategyBuilder struct{}
 
-func (dsb *drainStrategyBuilder) NewDrainStrategy(c client.Client, uc *upgradev1alpha1.UpgradeConfig, node *corev1.Node, cfg *NodeDrain) (DrainStrategy, error) {
+func (dsb *drainStrategyBuilder) NewNodeDrainStrategy(c client.Client, uc *upgradev1alpha1.UpgradeConfig, node *corev1.Node, cfg *NodeDrain) (NodeDrainStrategy, error) {
 	ts, err := getOsdTimedStrategies(c, uc, node, cfg)
 	if err != nil {
 		return nil, err

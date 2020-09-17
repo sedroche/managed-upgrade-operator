@@ -3,21 +3,23 @@ package drain
 import (
 	corev1 "k8s.io/api/core/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
+
+	"github.com/openshift/managed-upgrade-operator/pkg/pod"
 )
 
-func isPdbPod(pdbList *policyv1beta1.PodDisruptionBudgetList) podPredicate {
+func isPdbPod(pdbList *policyv1beta1.PodDisruptionBudgetList) pod.PodPredicate {
 	return func(p corev1.Pod) bool {
 		return containsMatchLabel(p, pdbList)
 	}
 }
 
-func isNotPdbPod(pdbList *policyv1beta1.PodDisruptionBudgetList) podPredicate {
+func isNotPdbPod(pdbList *policyv1beta1.PodDisruptionBudgetList) pod.PodPredicate {
 	return func(p corev1.Pod) bool {
 		return !containsMatchLabel(p, pdbList)
 	}
 }
 
-func isOnNode(node *corev1.Node) podPredicate {
+func isOnNode(node *corev1.Node) pod.PodPredicate {
 	return func(p corev1.Pod) bool {
 		return p.Spec.NodeName == node.Name
 	}

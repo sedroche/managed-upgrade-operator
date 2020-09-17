@@ -1,4 +1,4 @@
-package drain
+package pod
 
 import (
 	"context"
@@ -10,9 +10,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-type podPredicate func(corev1.Pod) bool
+type PodPredicate func(corev1.Pod) bool
 
-func Filter(podList *corev1.PodList, predicates ...podPredicate) *corev1.PodList {
+func FilterPods(podList *corev1.PodList, predicates ...PodPredicate) *corev1.PodList {
 	filteredPods := &corev1.PodList{}
 	for _, pod := range podList.Items {
 		var match = true
@@ -34,7 +34,7 @@ type DeleteResult struct {
 	Message string
 }
 
-func Delete(c client.Client, pl *corev1.PodList) (*DeleteResult, error) {
+func DeletePods(c client.Client, pl *corev1.PodList) (*DeleteResult, error) {
 	me := &multierror.Error{}
 	var podsMarkedForDeletion []string
 	for _, p := range pl.Items {
@@ -55,6 +55,8 @@ func Delete(c client.Client, pl *corev1.PodList) (*DeleteResult, error) {
 		}
 	}
 
+	// TODO: Log removing finalizers. and log no pods deleted better or don't log
+	// TODO: need to test both types on the one node
 	return &DeleteResult{Message: fmt.Sprintf("Pod(s) %s have been marked for deletion", strings.Join(podsMarkedForDeletion, ","))}, nil
 }
 

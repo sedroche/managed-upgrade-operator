@@ -1,4 +1,4 @@
-package drain
+package pod
 
 import (
 	corev1 "k8s.io/api/core/v1"
@@ -11,10 +11,10 @@ var _ = Describe("Pod Filter", func() {
 
 	var (
 		podList       *corev1.PodList
-		passPredicate podPredicate = func(p corev1.Pod) bool {
+		passPredicate PodPredicate = func(p corev1.Pod) bool {
 			return true
 		}
-		failPredicate podPredicate = func(p corev1.Pod) bool {
+		failPredicate PodPredicate = func(p corev1.Pod) bool {
 			return false
 		}
 	)
@@ -29,16 +29,18 @@ var _ = Describe("Pod Filter", func() {
 
 	Context("Filtering", func() {
 		It("should return pods that match a predicate", func() {
-			filteredPods := Filter(podList, passPredicate)
+			filteredPods := FilterPods(podList, passPredicate)
 			Expect(len(filteredPods.Items)).To(Equal(len(podList.Items)))
 		})
 		It("should return pods that matches all predicates", func() {
-			filteredPods := Filter(podList, passPredicate, passPredicate)
+			filteredPods := FilterPods(podList, passPredicate, passPredicate)
 			Expect(len(filteredPods.Items)).To(Equal(len(podList.Items)))
 		})
 		It("should filter pods that do not match the predicate(s)", func() {
-			filteredPods := Filter(podList, passPredicate, failPredicate, passPredicate)
+			filteredPods := FilterPods(podList, passPredicate, failPredicate, passPredicate)
 			Expect(len(filteredPods.Items)).To(Equal(0))
 		})
 	})
 })
+
+// TODO: Delete tests
