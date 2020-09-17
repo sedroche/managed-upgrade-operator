@@ -42,5 +42,3 @@ var _ = Describe("Pod Filter", func() {
 		})
 	})
 })
-
-// TODO: Delete tests
