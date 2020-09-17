@@ -31,20 +31,14 @@ func FilterPods(podList *corev1.PodList, predicates ...PodPredicate) *corev1.Pod
 }
 
 type DeleteResult struct {
-	Message string
+	Message              string
+	NumMarkedForDeletion int
 }
 
 func DeletePods(c client.Client, pl *corev1.PodList) (*DeleteResult, error) {
 	me := &multierror.Error{}
 	var podsMarkedForDeletion []string
 	for _, p := range pl.Items {
-		if len(p.ObjectMeta.GetFinalizers()) != 0 {
-			err := removeFinalizers(c, &p)
-			if err != nil {
-				return &DeleteResult{Message: fmt.Sprintf("Error removing finalizer for pod %s", p.Name)}, err
-			}
-		}
-
 		if p.DeletionTimestamp == nil {
 			err := c.Delete(context.TODO(), &p)
 			if err != nil {
@@ -55,19 +49,36 @@ func DeletePods(c client.Client, pl *corev1.PodList) (*DeleteResult, error) {
 		}
 	}
 
-	// TODO: Log removing finalizers. and log no pods deleted better or don't log
-	// TODO: need to test both types on the one node
-	return &DeleteResult{Message: fmt.Sprintf("Pod(s) %s have been marked for deletion", strings.Join(podsMarkedForDeletion, ","))}, nil
+	return &DeleteResult{
+		Message:              fmt.Sprintf("Pod(s) %s have been marked for deletion", strings.Join(podsMarkedForDeletion, ",")),
+		NumMarkedForDeletion: len(podsMarkedForDeletion),
+	}, me.ErrorOrNil()
 }
 
-func removeFinalizers(c client.Client, p *corev1.Pod) error {
-	emptyFinalizer := make([]string, 0)
-	p.ObjectMeta.SetFinalizers(emptyFinalizer)
+type RemoveFinalizersResult struct {
+	Message    string
+	NumRemoved int
+}
 
-	err := c.Update(context.TODO(), p)
-	if err != nil {
-		return err
+func RemoveFinalizersFromPod(c client.Client, pl *corev1.PodList) (*RemoveFinalizersResult, error) {
+	var podsWithFinalizersRemoved []string
+	me := &multierror.Error{}
+	for _, p := range pl.Items {
+		if len(p.ObjectMeta.GetFinalizers()) != 0 {
+			emptyFinalizer := make([]string, 0)
+			p.ObjectMeta.SetFinalizers(emptyFinalizer)
+
+			err := c.Update(context.TODO(), &p)
+			if err != nil {
+				me = multierror.Append(err, me)
+			} else {
+				podsWithFinalizersRemoved = append(podsWithFinalizersRemoved, p.Name)
+			}
+		}
 	}
 
-	return nil
+	return &RemoveFinalizersResult{
+		Message:    fmt.Sprintf("Finalizers removed for pods: %s", strings.Join(podsWithFinalizersRemoved, ",")),
+		NumRemoved: len(podsWithFinalizersRemoved),
+	}, me.ErrorOrNil()
 }

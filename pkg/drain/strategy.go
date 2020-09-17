@@ -51,4 +51,5 @@ func (dsb *drainStrategyBuilder) NewNodeDrainStrategy(c client.Client, uc *upgra
 
 type DrainStrategyResult struct {
 	Message string
+	HasExecuted bool
 }

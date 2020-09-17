@@ -44,7 +44,9 @@ func (ds *osdDrainStrategy) Execute(startTime *metav1.Time) ([]*DrainStrategyRes
 		if isAfter(startTime, ds.GetWaitDuration()) {
 			r, err := ds.GetStrategy().Execute()
 			me = multierror.Append(err, me)
-			res = append(res, &DrainStrategyResult{Message: fmt.Sprintf("Drain strategy %s has been executed. %s", ds.GetDescription(), r.Message)})
+			if r.HasExecuted {
+				res = append(res, &DrainStrategyResult{Message: fmt.Sprintf("Drain strategy %s has been executed. %s", ds.GetDescription(), r.Message)})
+			}
 		}
 	}
 

@@ -61,7 +61,7 @@ var _ = Describe("OSD Drain Strategy", func() {
 			gomock.InOrder(
 				mockTimedDrainOne.EXPECT().GetWaitDuration().Return(time.Minute*30),
 				mockTimedDrainOne.EXPECT().GetStrategy().Return(mockStrategyOne),
-				mockStrategyOne.EXPECT().Execute().Times(1).Return(&DrainStrategyResult{Message: ""}, nil),
+				mockStrategyOne.EXPECT().Execute().Times(1).Return(&DrainStrategyResult{Message: "", HasExecuted: true}, nil),
 				mockTimedDrainOne.EXPECT().GetDescription().Times(1).Return("Drain one"),
 			)
 			drainStartedFortyFiveMinsAgo := &metav1.Time{Time: time.Now().Add(-45 * time.Minute)}
@@ -99,7 +99,7 @@ var _ = Describe("OSD Drain Strategy", func() {
 			gomock.InOrder(
 				mockTimedDrainOne.EXPECT().GetWaitDuration().Return(time.Minute*30),
 				mockTimedDrainOne.EXPECT().GetStrategy().Return(mockStrategyOne),
-				mockStrategyOne.EXPECT().Execute().Times(1).Return(&DrainStrategyResult{Message: ""}, nil),
+				mockStrategyOne.EXPECT().Execute().Times(1).Return(&DrainStrategyResult{Message: "", HasExecuted: true}, nil),
 				mockTimedDrainOne.EXPECT().GetDescription().Times(1).Return("Drain one"),
 				mockTimedDrainTwo.EXPECT().GetWaitDuration().Return(time.Minute*60),
 				mockTimedDrainTwo.EXPECT().GetStrategy().Return(mockStrategyTwo),

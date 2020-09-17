@@ -56,3 +56,8 @@ func containsMatchLabel(p corev1.Pod, pdbList *policyv1beta1.PodDisruptionBudget
 
 	return isPdbPod
 }
+
+// TODO: test
+func hasFinalizers(p corev1.Pod) bool {
+	return len(p.ObjectMeta.GetFinalizers()) > 0
+}

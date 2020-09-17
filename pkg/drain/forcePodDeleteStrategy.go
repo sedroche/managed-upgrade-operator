@@ -18,16 +18,32 @@ func (fdps *forceDeletePodStrategy) Execute() (*DrainStrategyResult, error) {
 	allPods := &corev1.PodList{}
 	err := fdps.client.List(context.TODO(), allPods)
 	if err != nil {
-		return &DrainStrategyResult{Message: "Error listing pods for deletion"}, err
+		return nil, err
 	}
 
 	podsToDelete := pod.FilterPods(allPods, fdps.filters...)
-	res, err := pod.DeletePods(fdps.client, podsToDelete)
+	podsWithFinalizers := pod.FilterPods(podsToDelete, hasFinalizers)
+
+	finRes, err := pod.RemoveFinalizersFromPod(fdps.client, podsWithFinalizers)
 	if err != nil {
-		return &DrainStrategyResult{Message: res.Message}, err
+		return nil, err
 	}
 
-	return &DrainStrategyResult{Message: res.Message}, nil
+	delRes, err := pod.DeletePods(fdps.client, podsToDelete)
+	if err != nil {
+		return nil, err
+	}
+
+	result := &DrainStrategyResult{}
+	result.HasExecuted = finRes.NumRemoved > 0 || delRes.NumMarkedForDeletion > 0
+	if finRes.NumRemoved > 0 {
+		result.Message = finRes.Message
+	}
+	if delRes.NumMarkedForDeletion > 0 {
+		result.Message += `\n` + delRes.Message
+	}
+
+	return result, nil
 }
 
 func (fdps *forceDeletePodStrategy) HasFailed() (bool, error) {
