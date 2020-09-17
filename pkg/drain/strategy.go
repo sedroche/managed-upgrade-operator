@@ -21,13 +21,13 @@ type NodeDrainStrategy interface {
 	HasFailed(*metav1.Time) (bool, error)
 }
 
-//go:generate mockgen -destination=./drainStrategy.go -package=drain github.com/openshift/managed-upgrade-operator/pkg/drain DrainStrategy
+//go:generate mockgen -destination=./drainStrategyMock.go -package=drain github.com/openshift/managed-upgrade-operator/pkg/drain DrainStrategy
 type DrainStrategy interface {
 	Execute() (*DrainStrategyResult, error)
 	HasFailed() (bool, error)
 }
 
-//go:generate mockgen -destination=./timedDrainStrategy.go -package=drain github.com/openshift/managed-upgrade-operator/pkg/drain TimedDrainStrategy
+//go:generate mockgen -destination=./timedDrainStrategyMock.go -package=drain github.com/openshift/managed-upgrade-operator/pkg/drain TimedDrainStrategy
 type TimedDrainStrategy interface {
 	GetWaitDuration() time.Duration
 	GetName() string
