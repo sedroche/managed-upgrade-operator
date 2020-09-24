@@ -51,6 +51,7 @@ type Metrics interface {
 	IsAlertFiring(alert string, namespaces []string) (bool, error)
 	Query(query string) (*AlertResponse, error)
 	ResetMetrics()
+	ResetAllMetricNodeDrainFailed()
 }
 
 //go:generate mockgen -destination=mocks/metrics_builder.go -package=mocks github.com/openshift/managed-upgrade-operator/pkg/metrics MetricsBuilder
@@ -439,4 +440,8 @@ func (c *Counter) ResetMetrics() {
 	for _, m := range metricsList {
 		m.Reset()
 	}
+}
+
+func (c *Counter) ResetAllMetricNodeDrainFailed() {
+	metricNodeDrainFailed.Reset()
 }
