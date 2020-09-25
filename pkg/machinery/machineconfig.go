@@ -24,8 +24,8 @@ func (m *machinery) IsUpgrading(c client.Client, nodeType string) (*UpgradingRes
 	}
 
 	return &UpgradingResult{
-		IsUpgrading:  configPool.Status.MachineCount != configPool.Status.UpdatedMachineCount,
-		UpdatedCount: configPool.Status.UpdatedMachineCount,
-		MachineCount: configPool.Status.MachineCount,
+		IsUpgrading:  true,
+		UpdatedCount: 2,
+		MachineCount: 8,
 	}, nil
 }

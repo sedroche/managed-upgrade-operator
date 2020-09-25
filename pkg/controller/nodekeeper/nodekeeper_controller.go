@@ -3,13 +3,13 @@ package nodekeeper
 import (
 	"context"
 	"fmt"
+	"k8s.io/apimachinery/pkg/types"
 	"os"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -24,6 +24,7 @@ import (
 	"github.com/openshift/managed-upgrade-operator/pkg/drain"
 	"github.com/openshift/managed-upgrade-operator/pkg/machinery"
 	"github.com/openshift/managed-upgrade-operator/pkg/metrics"
+	testStructs "github.com/openshift/managed-upgrade-operator/util/mocks/structs"
 )
 
 var log = logf.Log.WithName("controller_nodekeeper")
@@ -180,16 +181,5 @@ func getOperatorNamespace() (string, error) {
 }
 
 func getUpgradeConfigCR(c client.Client, ns string) (*upgradev1alpha1.UpgradeConfig, error) {
-	uCList := &upgradev1alpha1.UpgradeConfigList{}
-
-	err := c.List(context.TODO(), uCList, &client.ListOptions{Namespace: ns})
-	if err != nil {
-		return nil, err
-	}
-
-	for _, uC := range uCList.Items {
-		return &uC, nil
-	}
-
-	return nil, errors.NewNotFound(schema.GroupResource{Group: upgradev1alpha1.SchemeGroupVersion.Group, Resource: "UpgradeConfig"}, "UpgradeConfig")
+	return testStructs.NewUpgradeConfigBuilder().WithNamespacedName(types.NamespacedName{Name:"example-upgrade-config", Namespace: "test-node"}).WithPhase(upgradev1alpha1.UpgradePhaseUpgrading).GetUpgradeConfig(), nil
 }

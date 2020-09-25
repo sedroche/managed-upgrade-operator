@@ -98,6 +98,7 @@ type ReconcileUpgradeConfig struct {
 func (r *ReconcileUpgradeConfig) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	reqLogger := log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
 	reqLogger.Info("Reconciling UpgradeConfig")
+	return reconcile.Result{}, nil
 
 	// Initialise metrics
 	metricsClient, err := r.metricsClientBuilder.NewClient(r.client)
